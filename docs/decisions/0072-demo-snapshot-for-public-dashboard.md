@@ -1,6 +1,7 @@
 # ADR-0072: Serve the public dashboard from a redacted parquet snapshot, not a live database
 
-- **Status:** Accepted
+- **Status:** Accepted; refined by ADR-0089 (the public deploy now runs live on a data bundle; this snapshot
+  is the fallback when no bundle or database is available)
 - **Date:** 2026-10-18
 - **Deciders:** AI workflow engineer (author)
 - **Component:** dashboard

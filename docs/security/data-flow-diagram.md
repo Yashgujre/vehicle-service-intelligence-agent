@@ -3,7 +3,8 @@
 - **Status:** Current as of 2026-10-19 (code at the same date)
 - **Scope:** The OCI VM deployment (ADR-0080) plus the batch jobs that build its data. Laptop mode
   collapses zones 1 to 3 onto one machine, uses SQLite and a local Ollama server, and has no Caddy,
-  n8n or Open WebUI (see `docs/architecture/deployment.md`).
+  n8n or Open WebUI (see `docs/architecture/deployment.md`). The hosted demo on Streamlit Community Cloud
+  (ADR-0088 to ADR-0092) has its own zones and flows, F42 to F54, in section 6.
 - **Method:** OWASP Threat Modeling Cheat Sheet system model (external entities, processes, data
   stores, data flows, trust boundaries), as recommended in
   `docs/research/01_documentation_process_research.md` section (c) topic 4.
@@ -253,6 +254,8 @@ Untrusted entry points (red outline):
 | Retrieved records | F32 to F35 | Indexed text (complaints, recall docs) | Complaint and document text redacted at index time; not tag-neutralised (gap G3) |
 | LLM replies | F38 to F40 | Model output | Schema validation and semantic checks before persistence |
 | n8n tool output | F26 | NHTSA recall JSON inside the native agent | None beyond the system prompt (workflow 05 is a demo variant) |
+| Hosted demo visitor input | F42 | Written complaints, chat questions, review notes, API keys | Same triage and chat guardrails; length caps 2,000 and 500 characters; keys kept in session state (section 6) |
+| Hosted demo data bundle | F45 | Database, index and model files from a release asset | sha256 check when configured; safe extraction under `data/` (section 6) |
 
 Redaction points (green outline). Full detail and measurements are in
 `docs/security/pii-handling.md`.
@@ -267,6 +270,8 @@ Redaction points (green outline). Full detail and measurements are in
 | RP6 | Dashboard display and demo snapshot export | `app/data.py` `redact_obj`, `scripts/export_demo_snapshot.py` |
 | RP7 | Span log attributes | `vsia/observability.py` `_scrub` |
 | RP8 | Native n8n triage (subset of rules) | `05_triage_agent_native.json` node "Redact PII" |
+| RP9 | Hosted demo data bundle: every complaint narrative in the database copy | `vsia/bundle.py` `_redacted_db_copy` |
+| RP10 | RAG chat question, before the plan and answer calls | `vsia/rag.py` line 76 |
 
 ## 5. Gaps visible on this diagram
 
@@ -283,4 +288,96 @@ threat model and the risk register. No code was changed in writing this document
 | G6 | `llm_calls.error` and `confidence_signals.llm_error` store Pydantic error text, which includes `input_value=` excerpts of model output | F41 | `src/vsia/llm.py` line 170; `src/vsia/agent.py` line 124 |
 | G7 | Raw PDFs go to LlamaCloud before redaction when the key is set | F7 | `src/vsia/documents.py` lines 59 to 63 |
 | G8 | `vin_prefix` is stored as NHTSA returns it, without truncation to 11 characters | F2 | `src/vsia/nhtsa.py` line 86 |
-| G9 | `docs/architecture/deployment.md` says the dashboard reads the VM API with the bearer token; `app/` contains no HTTP client and reads the database or the demo snapshot | F17 | `app/data.py` lines 1 to 13 |
+| G9 | `docs/architecture/deployment.md` said the dashboard reads the VM API with the bearer token; `app/` contains no HTTP client and reads the database or the demo snapshot. deployment.md was corrected on 2026-10-19 (no `VSIA_API_TOKEN` in Streamlit secrets); F17 is kept for the VM design | F17 | `app/data.py` lines 1 to 13 |
+| G10 | The bundle checksum is verified only when `VSIA_BUNDLE_SHA256` is set; without it any file served at `VSIA_BUNDLE_URL` is unpacked, including the joblib classifier and calibrators, which run code when loaded | F45 | `src/vsia/bundle.py` `ensure` |
+| G11 | Reviewer name and note typed on the hosted Human review page are stored unredacted in `labels` in the shared database until the app restarts | F53 | `app/views/review.py` lines 78 to 80 |
+| G12 | The Groq retry after a Gemini 429 on the triage page is not counted against the session cap and is not checked against the daily cap for Groq | F51 | `app/views/try_agent.py` lines 131 to 138 |
+
+## 6. Hosted demo (Streamlit Community Cloud)
+
+The hosted demo (ADR-0089) collapses the application zone into one Streamlit process: the agent, RAG chat,
+LLM gateway and query embedder run in-process, and the database is a SQLite file inside the container,
+shared by all visitors and reset on restart. There is no API, n8n, Open WebUI or Postgres. Visitors are
+anonymous members of the public, so everything they send is untrusted, and they may also send a secret:
+their own API key.
+
+```mermaid
+flowchart LR
+  subgraph H0["Zone H0: Internet and third parties"]
+    VIS["Visitor browser - anonymous"]
+    OPL["Operator laptop - bundle build"]
+    REL[("GitHub release asset - demo bundle")]
+    GEM["Google Gemini API - free tier"]
+    GRQ["Groq API - free tier"]
+    PAID["OpenAI / Anthropic APIs - visitor key only"]
+    FEM["fastembed model files"]
+  end
+
+  subgraph H1["Zone H1: Streamlit Community Cloud app process"]
+    APP("Streamlit pages - Try the agent, Ask the data, Human review")
+    SESS("Browser session state - visitor key, chat, call counter")
+    BOOT("Bootstrap - hosted.bootstrap, bundle.ensure")
+    AGTH("Triage agent - vsia.agent, in-process")
+    RAGH("RAG chat - vsia.rag, in-process")
+    GWH("LLM gateway - vsia.llm, use_keys")
+    EMB("Query embedder - fastembed nomic v1.5")
+  end
+
+  subgraph H2["Zone H2: Container file system, ephemeral"]
+    SQL[("data/vsia.db - shared SQLite")]
+    DAT[("data/index, data/models")]
+  end
+
+  VIS -->|F42| APP
+  APP -->|F43| SESS
+  OPL -->|F44| REL
+  REL -->|F45| BOOT
+  BOOT -->|F46| DAT
+  BOOT -->|F46| SQL
+  APP --> AGTH
+  APP --> RAGH
+  AGTH -->|F47| SQL
+  RAGH -->|F48| DAT
+  RAGH --> EMB
+  AGTH --> EMB
+  EMB -->|F49| FEM
+  AGTH --> GWH
+  RAGH --> GWH
+  GWH -->|F50| GEM
+  GWH -->|F51| GRQ
+  GWH -->|F52| PAID
+  APP -->|F53| SQL
+  GWH -->|F54| SQL
+
+  classDef untrusted stroke:#c0392b,stroke-width:3px;
+  classDef redaction stroke:#1e8449,stroke-width:3px;
+  class VIS,REL untrusted;
+  class AGTH,RAGH,OPL redaction;
+```
+
+`OPL` is outlined green because `vsia.bundle.build` redacts every complaint narrative in the database copy
+before packing (75 narratives changed in the first build, ADR-0091). `RAGH` is green here because
+`rag.answer` redacts the question before the plan and answer calls (`src/vsia/rag.py` line 76); that
+change also closes gap G1 in code, and the G1 entries in this document set predate it.
+
+| ID | From | To | Data | Boundary crossed | Transport and auth | Untrusted? | PII state | Code |
+|---|---|---|---|---|---|---|---|---|
+| F42 | Visitor browser | Streamlit pages | Picked complaint id, written complaint (up to 2,000 characters), chat question (up to 500 characters), review decisions with reviewer and note, model choice, and optionally the visitor's API key | H0 to H1 | HTTPS to Community Cloud; no login | **Yes, main entry point of the demo** | Whatever the visitor types; the "Write your own" tab asks for no personal information | `app/views/try_agent.py`, `ask.py`, `review.py`, `app/hosted.py` `model_picker` |
+| F43 | Streamlit pages | Session state | Visitor key, chat history, last run, shared-call counter | Within H1 | Streamlit session memory, per browser session | Yes | Visitor key is a secret; never persisted | `app/hosted.py`, `app/views/ask.py` |
+| F44 | Operator laptop | GitHub release asset | `vsia-demo-bundle.tar.gz` (redacted database, three index namespaces, classifier, calibrators, routing files) | Laptop to H0 | `gh release create` over HTTPS, GitHub account | n/a (outbound) | **Redacted** narratives | `scripts/build_demo_bundle.py`, `vsia.bundle.build` |
+| F45 | GitHub release asset | Bootstrap | The bundle, on first start | H0 to H1 | HTTPS download, redirects followed; sha256 compared with `VSIA_BUNDLE_SHA256` when set (gap G10) | **Yes, tampering entry point** | Redacted | `vsia.bundle.ensure` |
+| F46 | Bootstrap | Container file system | Unpacked files | H1 to H2 | Local file system; only regular files and directories under `data/`, no absolute paths or `..` | Yes until verified | Redacted | `vsia.bundle._safe_members` |
+| F47 | Triage agent | SQLite | Reads complaints and recalls; for a picked complaint writes `triage_records` and `review_queue` (run id `playground-<session>`); for a written complaint writes no triage or review row (`persist=False`) | H1 to H2 | SQLAlchemy | Model output after validation | Output derived from redacted text | `app/views/try_agent.py` lines 128 to 138 |
+| F48 | RAG chat | Local index and SQLite | Redacted search text and filters; aggregate counts | H1 to H2 | Local files | Results are untrusted retrieved text | **Redacted** | `vsia/rag.py` `answer` |
+| F49 | Query embedder | fastembed model files | Model download on the first search after a cold start (0.52 GB); no complaint or query text leaves the container | H1 to H0 | HTTPS | Model weights | None | `vsia/retrieval.py` `_fastembed_model` |
+| F50 | LLM gateway | Google Gemini API | Chat Completions with strict JSON schema: redacted, wrapped complaint plus candidates, or redacted question plus context | H1 to H0 and back | HTTPS, `Authorization: Bearer` with the shared `GEMINI_API_KEY` or the visitor's key | Reply is untrusted output | Redacted; free-tier content may be used by Google to improve its products (ADR-0088) | `vsia/llm.py` `_chat_completions("gemini")` |
+| F51 | LLM gateway | Groq API | Same payload; used on a Gemini 429 when `GROQ_API_KEY` exists, or with a visitor's Groq key | H1 to H0 and back | HTTPS, bearer key | Reply is untrusted output | Redacted | `vsia/llm.py` `_chat_completions("groq")` |
+| F52 | LLM gateway | OpenAI or Anthropic | As F38 and F39 | H1 to H0 and back | HTTPS, the visitor's key only | Reply is untrusted output | Redacted | `vsia/llm.py` `_call_openai`, `_call_anthropic` |
+| F53 | Human review page | SQLite `review_queue`, `labels` | Visitor review decisions | H1 to H2 | SQLAlchemy through `vsia.review.decide`; writes enabled because `VSIA_READONLY` is unset | Yes | Reviewer and note stored unredacted (gap G11) | `app/views/review.py`, `app/data.py` |
+| F54 | LLM gateway | SQLite `llm_calls` | Call metadata; also the counter the daily cap reads | H1 to H2 | SQLAlchemy | No prompt text, no key | Metadata | `vsia/llm.py` `complete_json`; `app/hosted.py` `hosted_calls_today` |
+
+Secrets in this deployment: `GEMINI_API_KEY`, optional `GROQ_API_KEY`, `VSIA_BUNDLE_URL` and
+`VSIA_BUNDLE_SHA256` live in Streamlit secrets, which Community Cloud exposes as environment variables. A
+visitor's key travels only in F42, F43 and the request headers of F50 to F52; it is passed per request
+through `vsia.llm.use_keys()` and is never written to the database, logs or `llm_calls` (ADR-0092).
+Chat questions and written complaints are not persisted; chat history lives in session state only.

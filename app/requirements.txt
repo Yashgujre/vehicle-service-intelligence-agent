@@ -1,7 +1,8 @@
-# Minimal, pinned dependencies for the dashboard on Streamlit Community Cloud.
+# Pinned dependencies for the hosted demo on Streamlit Community Cloud (ADR-0089).
 # Community Cloud reads app/requirements.txt (the entrypoint directory wins over the repo root, where
 # pyproject.toml would otherwise be picked up). Keep app/requirements.txt identical to this file;
-# tests/test_app_data.py checks that.
+# tests/test_app_data.py checks that. scikit-learn and joblib must match the versions that trained
+# data/models/component_clf.joblib; fastembed embeds queries in-process (ADR-0090).
 streamlit==1.66.0
 plotly==7.1.0
 pandas==3.0.6
@@ -11,3 +12,9 @@ sqlalchemy==2.1.5
 pydantic==2.14.1
 pydantic-settings==2.16.0
 pyyaml==6.0.3
+httpx==0.28.1
+tenacity==9.2.1
+scikit-learn==1.9.1
+joblib==1.6.0
+rank-bm25==0.2.2
+fastembed==0.9.0

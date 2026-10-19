@@ -6,7 +6,8 @@
   it executes. Main path: `vsia.agent.triage()`. Secondary paths: RAG chat (`vsia.rag`), recall document
   extraction (`vsia.documents`), chat and dashboard rendering, and the native n8n variant (workflow 05).
 - **Related:** `threat-model.md` (why each control exists), `pii-handling.md` (redaction detail and
-  measurements), `ai-risk-register.md`, ADR-0020 to ADR-0026, ADR-0007, ADR-0060 to ADR-0065, ADR-0077
+  measurements), `ai-risk-register.md`, ADR-0020 to ADR-0026, ADR-0007, ADR-0060 to ADR-0065, ADR-0077,
+  ADR-0088 and ADR-0092 (hosted demo providers, quota guard and visitor keys)
 
 ## 1. Overview
 
@@ -198,7 +199,18 @@ fires or the guardrail itself errors).
   `test_provider_schema_non_strict_keeps_pydantic_required`,
   `test_provider_schema_does_not_mutate_pydantic_cache`, `test_complete_json_rejects_unknown_provider`.
 - **On failure:** a provider exception ends the call without a repair attempt, logs `ok=False` and
-  raises `LLMError` (`test_complete_json_provider_exception_is_logged_without_retry`).
+  raises `LLMError` (`test_complete_json_provider_exception_is_logged_without_retry`). `LLMError.status`
+  carries the provider's HTTP status, so the hosted demo can tell a 429 quota error from other failures
+  (`test_missing_key_and_rate_limit_raise_llm_error_with_status`).
+- **Gemini and Groq (hosted demo, ADR-0088):** both go through one OpenAI-compatible caller
+  (`vsia.llm._chat_completions`) with a strict, self-contained JSON schema (`$ref` inlined by
+  `inline_refs`); the same validation and repair retry apply.
+- **API keys:** keys come from the environment or, for one request, from `vsia.llm.use_keys()`. The hosted
+  demo uses it for a visitor's own key: the key lives only in that browser session, is set in a context
+  variable for the duration of the call and reset afterwards, travels only in request headers, and is
+  never written to the database, logs or `llm_calls` (ADR-0092; test
+  `test_use_keys_overrides_environment_and_resets`). The shared free-tier key is capped per session and
+  per day by the hosted app (ADR-0092).
 
 ## 5. Output guardrails
 

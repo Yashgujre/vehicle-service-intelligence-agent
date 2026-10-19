@@ -112,21 +112,39 @@ def _ollama_embedder(texts: list[str]) -> list[list[float]]:
     return embed_ollama(texts)
 
 
-_embedder: Embedder = _ollama_embedder
+@lru_cache
+def _fastembed_model():
+    from fastembed import TextEmbedding
+
+    return TextEmbedding(config.settings()["embeddings"]["providers"]["fastembed"]["model"])
+
+
+def _fastembed_embedder(texts: list[str]) -> list[list[float]]:
+    return [v.tolist() for v in _fastembed_model().embed(texts)]
+
+
+def _default_embedder() -> Embedder:
+    """VSIA_EMBED_PROVIDER=fastembed runs the same model in-process (hosted demo, ADR-0090); default Ollama."""
+    return _fastembed_embedder if (config.env().vsia_embed_provider or "").lower() == "fastembed" \
+        else _ollama_embedder
+
+
+_embedder: Embedder | None = None
 
 
 def set_embedder(fn: Embedder | None) -> None:
-    """Swap the embedding function (tests use a deterministic fake). None restores Ollama."""
+    """Swap the embedding function (tests use a deterministic fake). None restores the configured default."""
     global _embedder
-    _embedder = fn or _ollama_embedder
+    _embedder = fn
 
 
 def embed_texts(texts: Sequence[str], prefix: str = "", batch_size: int = EMBED_BATCH,
                 progress: Callable[[int, int], None] | None = None) -> np.ndarray:
     """L2-normalised float32 matrix, one row per text."""
     out: list[list[float]] = []
+    embed = _embedder or _default_embedder()
     for i in range(0, len(texts), batch_size):
-        out.extend(_embedder([prefix + t for t in texts[i:i + batch_size]]))
+        out.extend(embed([prefix + t for t in texts[i:i + batch_size]]))
         if progress:
             progress(min(i + batch_size, len(texts)), len(texts))
     if not out:

@@ -107,6 +107,18 @@ llm:
       model: qwen2.5:3b
       base_url: http://localhost:11434
       price_per_mtok: {input: 0.0, output: 0.0}
+    # Free tiers used by the hosted demo (ADR-0088). Prices are 0 on the free tier; the paid-tier list
+    # price is kept for the cost model in docs/operations/cost-model.md.
+    gemini:
+      model: gemini-2.5-flash-lite
+      base_url: https://generativelanguage.googleapis.com/v1beta/openai
+      price_per_mtok: {input: 0.0, output: 0.0}
+      paid_price_per_mtok: {input: 0.10, output: 0.40}
+    groq:
+      model: openai/gpt-oss-20b
+      base_url: https://api.groq.com/openai/v1
+      price_per_mtok: {input: 0.0, output: 0.0}
+      extra_body: {reasoning_effort: low}
     heuristic:
       model: tfidf-logreg
       price_per_mtok: {input: 0.0, output: 0.0}
@@ -115,6 +127,9 @@ embeddings:
   default_provider: ollama
   providers:
     ollama: {model: nomic-embed-text, dim: 768}
+    # Same nomic-embed-text v1.5 weights run in-process with ONNX; reproduces the Ollama vectors
+    # (scripts/check_embed_parity.py), so the hosted demo searches the same index with no server (ADR-0090).
+    fastembed: {model: nomic-ai/nomic-embed-text-v1.5, dim: 768}
     pinecone: {model: llama-text-embed-v2, dim: 1024}
 
 forecast:

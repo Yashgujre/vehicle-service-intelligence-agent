@@ -16,6 +16,8 @@ From `config/settings.yaml` (`llm.providers.*.price_per_mtok`), which states "Pr
 | `anthropic` | `claude-haiku-5-5` | 0.10 | 0.50 | |
 | `openai` | `gpt-6-luna` | 0.10 | 0.50 | Settings note: `gpt-5-nano` (0.05 / 0.40) is cheaper but its only snapshot shuts down 2026-12-11 |
 | `ollama` | `qwen2.5:3b` | 0.00 | 0.00 | Local compute; not deployed on the VM |
+| `gemini` | `gemini-2.5-flash-lite` | 0.00 | 0.00 | Free tier, used by the hosted demo (ADR-0088). Paid-tier list price kept as `paid_price_per_mtok`: 0.10 input, 0.40 output (section 7) |
+| `groq` | `openai/gpt-oss-20b` | 0.00 | 0.00 | Free tier, hosted demo backup (ADR-0088); no paid price in settings |
 | `heuristic` | `tfidf-logreg` | 0.00 | 0.00 | No LLM |
 
 Prices change; when they do, update `config/settings.yaml` with a new verification date and re-run the
@@ -93,6 +95,7 @@ Not included:
 
 - Infrastructure: the deployment targets OCI Always Free, Pinecone Starter and Streamlit Community Cloud
   (ADR-0080, ADR-0087, ADR-0071), intended to cost nothing; their limits, not money, are the constraint.
+  The hosted demo is costed separately in section 7.
 - Embeddings: Ollama `nomic-embed-text` is free locally; Pinecone's hosted `llama-text-embed-v2` is limited
   by the Starter plan's embedding-token allowance, with no per-token price in settings.
 - Re-runs for evaluation: one full evaluation is 500 triage calls (300 calibration + 200 gold), so about
@@ -129,3 +132,47 @@ Two numbers will exist once evaluations run, and they differ on purpose:
   includes the tokens spent by failed calls.
 
 For budgeting, use `llm_calls`.
+
+## 7. Hosted demo (zero cost)
+
+The shareable hosted demo (ADR-0088 to ADR-0092, [runbook](runbooks/hosted-demo.md)) costs nothing to run.
+Every part is on a free tier:
+
+| Part | Service | Cost | Limit that matters |
+|---|---|---|---|
+| App hosting | Streamlit Community Cloud | 0 | About 2.7 GB memory and 2 CPU cores per app; sleeps after 12 hours without traffic (ADR-0089) |
+| Demo data bundle | GitHub release asset | 0 | One manual upload per data refresh (ADR-0091) |
+| Query embeddings | fastembed, in-process | 0 | 0.52 GB model download after a cold start (ADR-0090) |
+| Primary model | Google Gemini API free tier, `gemini-2.5-flash-lite` | 0 | See free-tier limits below |
+| Backup model | Groq free tier, `openai/gpt-oss-20b` (optional) | 0 | See free-tier limits below |
+| Visitor's own key | Visitor's provider account | 0 to the owner | Billed, if at all, to the visitor |
+
+Free-tier limits as stated in ADR-0088 (checked 2026-10-19; Google calls its limits "not guaranteed"):
+
+| Provider | Requests per minute | Requests per day | Tokens | Reset |
+|---|---|---|---|---|
+| Gemini, `gemini-2.5-flash-lite` | 15 | 1,000 | 250,000 per minute (Google's table as of March 2026; AI Studio shows the per-project values) | Midnight Pacific |
+| Groq, `openai/gpt-oss-20b` | 30 | 1,000 | 8,000 per minute; 200,000 per day | not stated in ADR-0088 |
+
+ADR-0088 sizes one triage call at about 2,400 input and 250 output tokens. At that size Gemini's request
+limits bind before its token limit. Groq's 8,000 tokens per minute allow about 3 triage calls a minute
+(ADR-0088), and its 200,000 tokens per day allow about 75 triage calls a day (200,000 / 2,650). These per-call
+sizes are estimates from ADR-0088; tokens per call on Gemini and Groq are not yet measured, and chat tokens
+per question are not yet measured.
+
+The app protects the shared quota with a cap of 15 AI calls per browser session and 400 calls per provider
+per day (ADR-0092), below Gemini's 1,000 requests per day. The runbook requires a Gemini key in a project
+with no billing account, so exceeding a limit returns errors (HTTP 429), not charges.
+
+**What-if: the same traffic on Gemini's paid tier.** `config/settings.yaml` keeps the paid list price for
+`gemini-2.5-flash-lite` as `paid_price_per_mtok`: 0.10 USD input and 0.40 USD output per million tokens.
+With the ADR-0088 call size:
+
+```text
+2,400 x 0.10 / 1e6 = 0.00024 USD
+  250 x 0.40 / 1e6 = 0.00010 USD
+cost per triage call ~= 0.00034 USD, or about 0.34 USD per 1,000 triage calls
+```
+
+If every call were triage-sized, the app's daily cap of 400 calls would cost about 0.14 USD a day, and
+Gemini's 1,000 requests a day about 0.34 USD a day. These are what-if figures from list prices and estimated token counts, not observed costs.

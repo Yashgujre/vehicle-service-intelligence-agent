@@ -1,10 +1,15 @@
 """LLM gateway (FR-6, FR-11). One function, `complete_json`, hides the provider. Switching between
-Claude, OpenAI and a local Ollama model is a config change (VSIA_LLM_PROVIDER / VSIA_LLM_MODEL).
+Claude, OpenAI, Gemini, Groq and a local Ollama model is a config change (VSIA_LLM_PROVIDER /
+VSIA_LLM_MODEL). Gemini and Groq are called through their OpenAI-compatible Chat Completions endpoints
+(ADR-0088).
 
 Every call:
   1. asks the provider for JSON constrained by the Pydantic model's schema (native structured output),
   2. validates the reply with Pydantic, and retries once with the validation error if it fails,
   3. logs provider, model, tokens, cost and latency to llm_calls (never the prompt text).
+
+API keys come from the environment, or from `use_keys()` for one request: the hosted demo uses it for a
+visitor's own key, which is never stored or logged.
 """
 
 from __future__ import annotations
@@ -12,6 +17,9 @@ from __future__ import annotations
 import copy
 import json
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TypeVar
 
@@ -31,7 +39,37 @@ _STRIP_KEYS = {"default", "title", "minimum", "maximum", "maxItems", "minItems",
 
 
 class LLMError(RuntimeError):
-    pass
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status  # HTTP status of the provider error, if any (429 = rate limit or quota)
+
+
+# Provider -> environment variable holding its key. Ollama and the heuristic baseline need none.
+KEY_ENV = {"anthropic": "anthropic_api_key", "openai": "openai_api_key", "gemini": "gemini_api_key",
+           "groq": "groq_api_key"}
+
+_key_override: ContextVar[dict[str, str]] = ContextVar("vsia_llm_keys", default={})
+
+
+@contextmanager
+def use_keys(keys: dict[str, str]) -> Iterator[None]:
+    """Use these API keys (provider -> key) for calls made inside the block, ahead of the environment."""
+    token = _key_override.set({**_key_override.get(), **{k: v for k, v in keys.items() if v}})
+    try:
+        yield
+    finally:
+        _key_override.reset(token)
+
+
+def api_key(provider: str) -> str | None:
+    if provider in _key_override.get():
+        return _key_override.get()[provider]
+    attr = KEY_ENV.get(provider)
+    return (getattr(config.env(), attr, None) or None) if attr else None
+
+
+def needs_key(provider: str) -> bool:
+    return provider in KEY_ENV
 
 
 @dataclass
@@ -71,6 +109,26 @@ def provider_schema(model: type[BaseModel], strict: bool = False) -> dict:
     return schema
 
 
+def inline_refs(schema: dict) -> dict:
+    """Replace every {"$ref": "#/$defs/X"} with the definition itself and drop $defs. Some OpenAI-compatible
+    endpoints accept only self-contained schemas."""
+    defs = schema.get("$defs", {})
+
+    def walk(node):
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and ref.startswith("#/$defs/"):
+                target = copy.deepcopy(defs[ref.split("/")[-1]])
+                extra = {k: v for k, v in node.items() if k != "$ref"}
+                return walk({**target, **extra})
+            return {k: walk(v) for k, v in node.items() if k != "$defs"}
+        if isinstance(node, list):
+            return [walk(v) for v in node]
+        return node
+
+    return walk(schema)
+
+
 def _retryable(exc: BaseException) -> bool:
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code in (408, 409, 429) or exc.response.status_code >= 500
@@ -96,7 +154,7 @@ def _call_ollama(model: str, system: str, user: str, schema: dict, max_tokens: i
 
 @_retry
 def _call_anthropic(model: str, system: str, user: str, schema: dict, max_tokens: int, temperature: float):
-    key = config.env().anthropic_api_key
+    key = api_key("anthropic")
     if not key:
         raise LLMError("ANTHROPIC_API_KEY is not set")
     r = httpx.post("https://api.anthropic.com/v1/messages", timeout=120.0,
@@ -113,7 +171,7 @@ def _call_anthropic(model: str, system: str, user: str, schema: dict, max_tokens
 
 @_retry
 def _call_openai(model: str, system: str, user: str, schema: dict, max_tokens: int, temperature: float):
-    key = config.env().openai_api_key
+    key = api_key("openai")
     if not key:
         raise LLMError("OPENAI_API_KEY is not set")
     r = httpx.post("https://api.openai.com/v1/responses", timeout=120.0,
@@ -131,7 +189,34 @@ def _call_openai(model: str, system: str, user: str, schema: dict, max_tokens: i
     return text, int(u.get("input_tokens", 0)), int(u.get("output_tokens", 0))
 
 
-_PROVIDERS = {"ollama": _call_ollama, "anthropic": _call_anthropic, "openai": _call_openai}
+def _chat_completions(provider: str):
+    """Caller for an OpenAI-compatible /chat/completions endpoint (Gemini, Groq). base_url and optional
+    extra request fields (for example reasoning_effort) come from config llm.providers.<provider>."""
+
+    @_retry
+    def call(model: str, system: str, user: str, schema: dict, max_tokens: int, temperature: float):
+        key = api_key(provider)
+        if not key:
+            raise LLMError(f"{KEY_ENV[provider].upper()} is not set")
+        pcfg = config.settings()["llm"]["providers"][provider]
+        r = httpx.post(f"{pcfg['base_url'].rstrip('/')}/chat/completions", timeout=120.0,
+                       headers={"Authorization": f"Bearer {key}"},
+                       json={"model": model, "max_tokens": max_tokens, "temperature": temperature,
+                             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                             "response_format": {"type": "json_schema", "json_schema": {
+                                 "name": "output", "strict": True, "schema": inline_refs(schema)}},
+                             **pcfg.get("extra_body", {})})
+        r.raise_for_status()
+        d = r.json()
+        text = (d.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+        u = d.get("usage") or {}
+        return text, int(u.get("prompt_tokens", 0)), int(u.get("completion_tokens", 0))
+
+    return call
+
+
+_PROVIDERS = {"ollama": _call_ollama, "anthropic": _call_anthropic, "openai": _call_openai,
+              "gemini": _chat_completions("gemini"), "groq": _chat_completions("groq")}
 
 
 def complete_json(system: str, user: str, output_model: type[T], *, purpose: str,
@@ -143,18 +228,21 @@ def complete_json(system: str, user: str, output_model: type[T], *, purpose: str
         raise LLMError(f"unknown or non-LLM provider: {provider}")
     cfg = config.settings()["llm"]
     max_tokens = max_tokens or cfg["max_output_tokens"]
-    schema = provider_schema(output_model, strict=(provider == "openai"))
+    schema = provider_schema(output_model, strict=provider in ("openai", "gemini", "groq"))
     fn = _PROVIDERS[provider]
 
     total_in = total_out = 0
     started = time.perf_counter()
     msg = user
     last_err: str | None = None
+    status: int | None = None
     for attempt in range(2):
         try:
             text, tin, tout = fn(model, system, msg, schema, max_tokens, cfg["temperature"])
         except Exception as e:  # noqa: BLE001
             last_err = f"{type(e).__name__}: {e}"
+            if isinstance(e, httpx.HTTPStatusError):
+                status = e.response.status_code
             break
         total_in += tin
         total_out += tout
@@ -181,7 +269,7 @@ def complete_json(system: str, user: str, output_model: type[T], *, purpose: str
                    latency_ms=int((time.perf_counter() - started) * 1000), ok=False, error=last_err,
                    prompt_version=prompt_version, ref_id=ref_id)
     log_llm_call(call)
-    raise LLMError(last_err or "LLM call failed")
+    raise LLMError(last_err or "LLM call failed", status=status)
 
 
 @_retry

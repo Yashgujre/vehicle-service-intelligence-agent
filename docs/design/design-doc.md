@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | Implemented on the laptop; VM deployment defined but not yet exercised end to end |
+| Status | Implemented on the laptop; free hosted demo on Streamlit Community Cloud defined (ADR-0088 to ADR-0092); VM deployment defined but not yet exercised end to end |
 | Author | Project author (AI workflow engineer) |
 | Last updated | 2026-10-19 |
-| Decision records | [docs/decisions/](../decisions/) (ADR-0001 to ADR-0087) |
+| Decision records | [docs/decisions/](../decisions/) (ADR-0001 to ADR-0092) |
 | Requirements | The project PRD (FR-1 to FR-12); the PRD file is not in this repository, FR numbers are quoted below |
 
 This is a Google-style design doc: context, goals, the design and its trade-offs, cross-cutting concerns
@@ -52,7 +52,7 @@ multi-user product, and fine-tuning models.
 | G3 | Hybrid retrieval over recalls, recall documents and complaints (FR-3) | Top-5 in under 1 s; recall@5 at least 80% | Index built for recalls (407) and recall_docs (352) (ADR-0030, ADR-0033); latency and recall@5 measured in docs/evaluation/ (pending) |
 | G4 | Triage each complaint into extracted fields, component, severity and recall matches with citations (FR-4) | Component accuracy at least 85% | Measured in docs/evaluation/ (pending) |
 | G5 | Route uncertain triage to a human and turn the decision into a label (FR-5) | At least 70% auto-routed | Measured in docs/evaluation/ (pending) |
-| G6 | Switch LLM provider by configuration (FR-6) | Same code, any provider | Implemented for Ollama, Anthropic, OpenAI and a no-LLM heuristic (ADR-0002) |
+| G6 | Switch LLM provider by configuration (FR-6) | Same code, any provider | Implemented for Ollama, Anthropic, OpenAI, Gemini, Groq and a no-LLM heuristic (ADR-0002, ADR-0088) |
 | G7 | Weekly per-component forecast and spike alerts (FR-7) | Beat seasonal naive | Measured in docs/evaluation/ (pending); no champion model is registered yet |
 | G8 | Dashboard (FR-8) | Pages load in under 5 s | Cold load 1.6 s, warm 0.25 to 0.56 s on the demo snapshot (ADR-0074) |
 | G9 | Chat over the corpus with citations (FR-9) | Grounded answers, refusals out of scope | Implemented (ADR-0065); quality measured in docs/evaluation/ (pending) |
@@ -81,8 +81,8 @@ flowchart LR
     mlf[("MLflow")]
     owui["Open WebUI<br/>chat pipe"]
   end
-  llm["LLM providers<br/>Ollama, Anthropic, OpenAI"]
-  dash["Streamlit dashboard<br/>demo snapshot"]
+  llm["LLM providers<br/>Ollama, Anthropic, OpenAI,<br/>Gemini and Groq free tiers"]
+  dash["Streamlit app on Community Cloud<br/>hosted demo: agent and chat in-process;<br/>snapshot as fallback"]
   users["Quality engineers,<br/>service analysts"]
 
   nhtsa --> api
@@ -96,7 +96,8 @@ flowchart LR
   jobs --> db
   jobs --> idx
   jobs --> mlf
-  db -.->|"redacted parquet export"| dash
+  db -.->|"redacted parquet export,<br/>redacted data bundle"| dash
+  dash -->|"free-tier calls"| llm
   users --> owui
   users --> dash
 ```
@@ -152,6 +153,11 @@ Each subsection names the code, the decision records and the main trade-off. Run
   provider (ADR-0002). Models: `qwen2.5:3b` on Ollama, `claude-haiku-5-5` on Anthropic, `gpt-6-luna` on
   OpenAI, both hosted models priced at $0.10 input and $0.50 output per million tokens in
   `config/settings.yaml` (ADR-0006). Temperature 0, at most 700 output tokens.
+- For the hosted demo, `gemini-2.5-flash-lite` on Google Gemini and `openai/gpt-oss-20b` on Groq, both on
+  free tiers (price 0), go through one OpenAI-compatible caller (`_chat_completions`) with a strict,
+  self-contained schema. `LLMError.status` carries the provider's HTTP status so callers can tell a 429
+  from other failures. `use_keys()` supplies a visitor's own key for one request without storing or
+  logging it (ADR-0088, ADR-0092).
 - Sends a provider-specific cleaned JSON schema, re-validates the reply with Pydantic and retries once with
   the validator message (ADR-0007). Transport retries cover 408, 409, 429 and 5xx.
 - Writes one `llm_calls` row per call with tokens, cost, latency, outcome, prompt version and business key;
@@ -263,10 +269,14 @@ Workflows are exported to git, inactive, and validated statically by `scripts/va
 
 ### 4.13 Dashboard (`app/`)
 
-Streamlit (ADR-0071) with overview, triage, trends, review, evaluation and about pages. The public
-deployment reads a redacted parquet snapshot in `app/demo_data/` (152,565 bytes, exported 2026-10-19
-06:12 UTC) instead of calling the API (ADR-0072); caching follows ADR-0074. Details:
-[architecture/dashboard.md](../architecture/dashboard.md).
+Streamlit (ADR-0071) with "Try the agent" and "Ask the data" pages plus overview, triage, trends, review,
+evaluation and about pages. The public deployment is the hosted demo on Streamlit Community Cloud: it runs
+`vsia.agent.triage()` and `vsia.rag.answer()` in-process on a shared, ephemeral SQLite database downloaded
+as a checksummed, redacted release asset, embeds queries in-process with fastembed, and calls free-tier
+Gemini with Groq as backup, a visitor's own key or the offline classifier, under per-session and per-day
+caps (ADR-0088 to ADR-0092, refining ADR-0072). The redacted parquet snapshot in `app/demo_data/` (152,565
+bytes, exported 2026-10-19 06:12 UTC) is the fallback when no bundle is configured; caching follows
+ADR-0074. Details: [architecture/dashboard.md](../architecture/dashboard.md).
 
 ### 4.14 Deployment (`infra/`, `docker-compose`)
 
@@ -275,7 +285,8 @@ Docker Compose, with memory limits that sum to 8.25 GB (ADR-0080). Only Caddy is
 host names (ADR-0082, ADR-0083); services sit on an internal backend network. Terraform with local state
 (ADR-0084), cloud-init bootstrap with secrets copied over SSH (ADR-0085), one Postgres instance with a
 database per service (ADR-0086), and the Pinecone index managed by Terraform (ADR-0087). The laptop runs
-without Docker (ADR-0008). Details: [architecture/deployment.md](../architecture/deployment.md).
+without Docker (ADR-0008). The shareable path is separate: the free hosted demo on Streamlit Community
+Cloud (ADR-0089), which needs no VM. Details: [architecture/deployment.md](../architecture/deployment.md).
 
 ## 5. APIs
 
@@ -346,6 +357,7 @@ Each decision has an ADR with the options and trade-offs. Summary of the main on
 | Recall matches | Grounded in candidates, component overlap | Trust model citations | [0063](../decisions/0063-recall-match-grounding-rules.md) |
 | Chat | Router pattern | Single prompt over all sources | [0065](../decisions/0065-rag-chat-router-pattern.md) |
 | Dashboard | Streamlit with a public snapshot | Live API reads | [0071](../decisions/0071-streamlit-for-the-dashboard.md), [0072](../decisions/0072-demo-snapshot-for-public-dashboard.md) |
+| Public demo | Interactive app on Streamlit Community Cloud, agent in-process, free-tier Gemini with Groq backup, bundle as a release asset, per-session and per-day caps | Read-only snapshot only; OCI VM with the full stack | [0088](../decisions/0088-free-tier-llm-for-the-hosted-demo.md), [0089](../decisions/0089-hosted-interactive-demo-on-streamlit-community-cloud.md), [0090](../decisions/0090-in-process-onnx-embedder-for-the-hosted-demo.md), [0091](../decisions/0091-demo-data-bundle-as-release-asset.md), [0092](../decisions/0092-quota-guard-and-visitor-key-handling.md) |
 | n8n role | Workflows call the API; native agent is a variant | Native n8n agent as the main path | [0075](../decisions/0075-n8n-workflows-call-the-api-native-agent-is-a-variant.md) |
 | Chat transport | Non-streaming pipe through n8n | Direct Open WebUI to API | [0076](../decisions/0076-open-webui-pipe-non-streaming-through-n8n.md) |
 | Hosting | Docker Compose on one A1 VM | Managed services | [0080](../decisions/0080-docker-compose-on-one-a1-vm.md) |
@@ -357,7 +369,9 @@ Each decision has an ADR with the options and trade-offs. Summary of the main on
 - PII: narratives are redacted before any LLM, embedding, index, log or published file; redaction points
   and known gaps are listed in [data-flow.md](../architecture/data-flow.md#redaction-points).
 - Prompt injection: rule-based detection, spotlighting, and forced human review on suspicion.
-- Secrets in `.env` and n8n credentials only; only the reverse proxy is public (ADR-0083).
+- Secrets in `.env` and n8n credentials only; only the reverse proxy is public (ADR-0083). The hosted demo
+  keeps its free-tier keys and bundle checksum in Streamlit secrets; a visitor's own key stays in that
+  browser session and is never stored or logged (ADR-0092).
 - Threats, mitigations and residual risk: [security/threat-model.md](../security/threat-model.md);
   trust boundaries: [security/data-flow-diagram.md](../security/data-flow-diagram.md); AI-specific risks:
   [security/ai-risk-register.md](../security/ai-risk-register.md).
@@ -414,7 +428,7 @@ Docker on the development laptop).
 | 4. Forecast champion | Successful training run, champion registered, holdout WAPE compared with seasonal naive | Blocked: first run failed |
 | 5. VM deployment | Terraform apply, Compose up, health checks green, workflows imported and activated one at a time | Defined, not exercised |
 | 6. Shadow operation | Daily workflow 01 active with notifications; review queue worked daily; SLIs collected for 28 days | Not started |
-| 7. Public demo | Snapshot refreshed from VM data, dashboard published | Snapshot exported from the laptop with empty triage and forecast tables |
+| 7. Public demo | Hosted demo deployed on Streamlit Community Cloud from a redacted data bundle and passing the runbook smoke test (ADR-0089, [runbook](../operations/runbooks/hosted-demo.md)); snapshot kept as the fallback | Hosted demo code, bundle build and runbook in place; first bundle built (62,837,362 bytes, ADR-0091). Snapshot exported from the laptop with empty triage and forecast tables |
 
 Rollback: deactivate the n8n workflow (the API remains for manual use); switch `VSIA_LLM_PROVIDER` to
 `ollama` or `heuristic` during a provider outage. No database backup job is defined in `infra/` yet (see

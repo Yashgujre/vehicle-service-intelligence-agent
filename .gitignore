@@ -17,6 +17,9 @@ data/mlartifacts/
 data/processed/
 mlruns/
 logs/
+dist/
+data/.bundle.json
+data/bundle_manifest.json
 
 # Terraform
 infra/terraform/.terraform/

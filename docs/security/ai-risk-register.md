@@ -5,7 +5,8 @@
   Manage. Risk categories from NIST AI 600-1, Generative AI Profile (July 2024). NIST states AI RMF 1.0
   is under revision, so the version numbers are cited explicitly.
 - **Inputs:** `docs/security/threat-model.md` (threat ids such as C-I1), `docs/security/data-flow-diagram.md`
-  (gaps G1 to G9), `docs/security/pii-handling.md`, `docs/security/guardrails.md`
+  (gaps G1 to G12), `docs/security/pii-handling.md`, `docs/security/guardrails.md`, ADR-0088 to ADR-0092
+  (hosted demo)
 - **Format guidance:** `docs/research/01_documentation_process_research.md`, section (b), "AI risk
   register" row (risk, NIST function, owner, control, status)
 
@@ -71,6 +72,11 @@ reason); Pending measurement.
 | R-27 | VIN stored longer than the 11-character prefix if NHTSA ever returns a full VIN | Manage | Data Privacy | Low (loaded lengths 9 to 11) | Low | AI workflow engineer | None at ingest; ADR-0022 policy | Open | Gap G8; `nhtsa.py` line 86; `db.py` `vin_prefix String(17)` |
 | R-28 | Raw recall PDFs sent to LlamaCloud before redaction | Map | Data Privacy | Low (optional path) | Low (public documents) | Operator | Default parser is local `pypdf` (ADR-0031) | Accepted | Gap G7 |
 | R-29 | Decisions and controls undocumented or drift from code | Govern | Information Integrity | Medium | Medium | AI workflow engineer | ADRs (MADR template), this register, threat model, DFD, prompt specs with version ids | Partial | This document set; inconsistencies listed in `guardrails.md` section 9 |
+| R-30 | Hosted demo: the free-tier provider (Google Gemini) may use submitted prompts to improve its products, so any PII that survives redaction or that a visitor types leaves the project's control | Govern | Data Privacy | Low (public data, redacted before sending) | Medium | AI workflow engineer | Bundle database redacted at build (`vsia.bundle._redacted_db_copy`); triage and chat redact before every call; "Write your own" tab warns visitors not to enter personal information; ADR-0088 | Accepted | Threat H-I2; ADR-0088 "Trade-offs accepted"; `test_bundle_build_redacts_and_ensure_installs`; regex misses per R-02 |
+| R-31 | Hosted demo: one visitor or a script exhausts the shared free-tier quota, so the demo stops making AI calls for everyone until midnight Pacific | Manage | Information Security (availability) | Medium | Low (offline classifier and visitor keys keep the demo usable; no spend on a project without billing) | Operator | 15 AI calls per session and 400 per provider per day on the shared key (`app/hosted.py` `quota_block`, ADR-0092); Groq backup on 429; visitor's own key; offline classifier | Partial | Threat H-D1; gap G12; the daily count resets when the app restarts; no automated test of `quota_block` |
+| R-32 | Hosted demo: a tampered data bundle poisons the demo database or index, or runs code through the joblib classifier and calibrators | Manage | Value Chain and Component Integration; Information Security | Low (checksum required by the runbook) | High | Operator | sha256 check against `VSIA_BUNDLE_SHA256`; extraction limited to regular files and directories under `data/` (`vsia.bundle._safe_members`, ADR-0091) | Partial | Threat H-T1; gap G10 (no check when the secret is unset); `test_bundle_rejects_paths_outside_data` |
+| R-33 | Hosted demo: a visitor's own API key is stored, logged or exposed to another session | Manage | Information Security; Data Privacy | Low | Medium | AI workflow engineer | Password field; session state only; passed per request through `vsia.llm.use_keys()`; never in the database, logs or `llm_calls` (ADR-0092) | Implemented | Threat H-I1; `test_use_keys_overrides_environment_and_resets`; `test_llm_calls_never_store_prompt_text` |
+| R-34 | Hosted demo: visitor free text persists in the shared database (reviewer name and note on the Human review page), unredacted, until the app restarts | Manage | Data Privacy | Low | Low | AI workflow engineer | Written complaints and chat questions are not persisted; database is ephemeral and reset on restart (ADR-0089) | Accepted | Threat H-T2; gap G11 |
 
 ## Measurements behind the register
 

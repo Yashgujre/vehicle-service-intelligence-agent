@@ -2,24 +2,36 @@
 
 Rolling-origin backtest of the weekly per-component complaint forecaster in `pipelines/forecast.py` and
 `pipelines/features.py`, against simple baselines. Model card: [model-card-forecaster.md](model-card-forecaster.md).
-Decisions: ADR-0050 to ADR-0054.
+Decisions: ADR-0050 to ADR-0055.
 
 ## Status
 
-**Preliminary. No champion is registered.** The only training run so far,
-`train-20261019T054635Z` (MLflow parent run `b27e9d07c7f84d9da27ab31e5c279309`, experiment
-`vsia-forecast`, 2026-10-19 05:46 UTC), completed the backtest for all seven candidates, wrote the
-summary table and plots, then **failed** while logging the `glm_poisson` candidate's model (that nested
-run is FAILED; its metrics and CSV artifacts were logged, its model artifact was not). Because of the
-failure, the `gbm` nested run was never created, `register_champion()` never ran, and the registry has no
-`vsia-complaint-forecaster` model and no `champion` alias. MLflow does not record the error message;
-reproduce with `python -m pipelines.forecast train --force` and read the console output.
+**Completed. A champion is registered.** Training run `train-20261019T182422Z` (MLflow parent run
+`6c61abbf263f4e77b195d6d4d4d3c595`, experiment `vsia-forecast`, 2026-10-19 18:24 UTC) finished with all
+seven nested candidate runs FINISHED and took 19.3 s. The selection rule chose `glm_poisson`, which is
+registered as `vsia-complaint-forecaster` version 1 with alias `champion`, from nested run
+`98acce0d6c244ef9a75db49e2e9a1ea5`. Sources: `logs/forecast_train.log`; the MLflow tables `runs`,
+`model_versions`, `registered_model_aliases` and `model_version_tags` in `data/mlflow.db`.
 
-The numbers below come from that run's logged metrics (five FINISHED candidate runs plus the FAILED
-`glm_poisson` run) and from the parent run's `summary.csv` artifact, which is the only record of the
-`gbm` scores. They are real outputs of the pipeline but not of a completed, registered training. Final
-champion numbers: measured in the MLflow model version description and tags of
-`vsia-complaint-forecaster@champion` (pending).
+| Item | Value | Source |
+|---|---|---|
+| Registered model, version, alias | `vsia-complaint-forecaster` v1, `@champion`, status READY | `model_versions`, `registered_model_aliases` |
+| Champion family and run | `glm_poisson`, run `98acce0d6c244ef9a75db49e2e9a1ea5` | version tags `model_family`, `run_id` |
+| Training cut | `train_end_week` 2026-07-13 (last training week before the holdout) | version tag `train_end_week` |
+| Holdout 1-step WAPE, ratio to seasonal naive | 50.332, 0.763, `beats_seasonal_naive_1step` True | version tags |
+| Data fingerprint | `ba0e4154ef3b8c37` | version tag `data_fingerprint` |
+| Other candidate runs | `naive` `4ed02b75a25d448782939c8896ac5348`, `snaive52` `7f4b4c39c02a4625a5697c692c36cb0c`, `ma4` `a38441e4ac224d35aa47e0fa1522daab`, `ma8` `e49a7f37463344adbb22a0110bae09f2`, `ses` `c9d72cda6f724f50b20434e6cf678d95`, `gbm` `217c529707b34a8da67e3a309fba55e1` | run ids line of `logs/forecast_train.log` |
+
+`detect` then ran with the champion and wrote 320 forecast rows (240 out-of-sample rows plus 80 rows for
+4 future weeks) and 18 spike alerts (`logs/forecast_detect.log`; `forecasts` and `spike_alerts` tables in
+`data/vsia.db`, all rows carrying run id `98acce0d6c244ef9a75db49e2e9a1ea5`).
+
+**Earlier failed runs.** Three train runs earlier on 2026-10-19 (`b27e9d07c7f84d9da27ab31e5c279309` at
+05:46 UTC, `5473a25c5bae4bd49c6fd2a223c74b37` and `d40574c4597e4deb8cae876441790561` at 18:23 UTC) are
+FAILED in MLflow; each stopped while logging a candidate model, so no champion was registered. ADR-0055
+records the cause for the first run: MLflow's default skops format refuses the custom forecaster wrapper
+and gradient boosting's `TreePredictor`. The pipeline now logs models with cloudpickle and loads only from
+this project's private registry (ADR-0055).
 
 ## 1. Series
 
@@ -32,6 +44,8 @@ champion numbers: measured in the MLflow model version description and tags of
 | Series | 20: 19 components plus OTHER | MLflow param `n_components` |
 | Pooled into OTHER | ELECTRONIC STABILITY CONTROL (1 complaint), HYBRID PROPULSION SYSTEM (3), LATCHES/LOCKS/LINKAGES (22), PARKING BRAKE (10): fewer than 30 in total | MLflow param `pooled_components`; `min_weekly_total: 30`; counts from `data/vsia.db` |
 | Data fingerprint | `ba0e4154ef3b8c37` | MLflow tag `data_fingerprint` |
+
+MLflow params and tags in this table are those of parent run `6c61abbf263f4e77b195d6d4d4d3c595`.
 
 The overall series ([plot](forecast-plots/overall_weekly_volume.png)) runs from about 10 to about 120
 complaints per week (the first weeks of 2022 and early 2026 exceed 120), with a rise in level through
@@ -98,7 +112,7 @@ Definitions are in `pipelines/features.py`; all percentages are in percent.
 validation 1-step WAPE over the three validation folds. Baselines and SES are benchmarks: they are scored
 and logged but are not eligible for the registry (ADR-0051, ADR-0052).
 
-## 3. Results (preliminary)
+## 3. Results
 
 Holdout is fold 3 (240 component-weeks, 649 complaints). Validation columns average folds 0 to 2.
 
@@ -112,14 +126,17 @@ Holdout is fold 3 (240 component-weeks, 649 complaints). Validation columns aver
 | glm_poisson | 53.00 | 1.161 | **50.33** | **1.36** | 0.974 | **58.41** | 12.63 | 0.908 | **0.763** | 51.46 | 0.780 |
 | gbm | 53.80 | 1.162 | 50.83 | 1.37 | 0.992 | 60.23 | 17.14 | 0.854 | 0.771 | 51.12 | 0.775 |
 
-Source: MLflow metrics `val_wape_1step`, `val_mase_1step`, `hold_*`, `rel_wape_vs_snaive_*` of the
-candidate runs, and `summary.csv` in parent run `b27e9d07c7f84d9da27ab31e5c279309` (only source for
-`gbm`). Bold marks the best value per column; coverage has no bold because the goal is closeness to 0.90,
+Source: the completed run, that is the summary table printed in `logs/forecast_train.log`, the
+`summary.csv` artifact of parent run `6c61abbf263f4e77b195d6d4d4d3c595`, and the MLflow metrics
+`val_wape_1step`, `val_mase_1step`, `hold_*` and `rel_wape_vs_snaive_*` of its seven candidate runs. Every
+value is identical, after rounding, to the table first taken from failed run
+`b27e9d07c7f84d9da27ab31e5c279309`. Bold marks the best value per column; coverage has no bold because the goal is closeness to 0.90,
 not the highest value.
 
 ### Reading
 
-1. **The champion rule would select `glm_poisson`** (validation WAPE 53.00 against 53.80 for `gbm`).
+1. **The champion rule selected `glm_poisson`** (validation WAPE 53.00 against 53.80 for `gbm`), now
+   registered as `vsia-complaint-forecaster` v1 `@champion`.
 2. **Two simple methods did better on validation than both eligible models**: SES (50.32) and the 4-week
    moving average (50.95). On the holdout, `glm_poisson` (50.33) and SES (50.43) are within 0.1 points,
    with `gbm` at 50.83 and `ma8` at 51.56. With 649 complaints in the holdout, differences of about 1
@@ -138,7 +155,8 @@ not the highest value.
 
 ### Per-component holdout, `glm_poisson`, 1-step
 
-From `per_component_1step.csv` of run `ce5c1a2652dc429c91df2973f1cc55ff`.
+From `per_component_1step.csv` of champion run `98acce0d6c244ef9a75db49e2e9a1ea5` (byte-identical to the
+same file in the earlier failed run `ce5c1a2652dc429c91df2973f1cc55ff`).
 
 | Component | Holdout complaints | Zero weeks | WAPE | MASE | Coverage |
 |---|---|---|---|---|---|
@@ -170,37 +188,118 @@ read MASE and coverage for those. SUSPENSION is the clear miss: a cluster in lat
 ![Top six components, holdout](forecast-plots/top6_components_holdout.png)
 
 The plot shows the six highest-volume series for the 40 weeks before the holdout and the holdout itself,
-with the `glm_poisson` 1-step forecast, its 90% interval, the seasonal naive and the weeks that would be
-flagged as spikes.
+with the `glm_poisson` 1-step forecast, its 90% interval, the seasonal naive and the weeks flagged as
+spikes.
 
-## 4. Spike flags on the holdout
+## 4. Spike alerts and out-of-sample checks
 
 The spike rule (ADR-0054) flags a component-week when the actual is strictly above the interval upper
-bound and at least 3 complaints. `detect` has not run (`spike_alerts` is empty), so there are no stored
-alerts. Applying the rule to the backtest holdout predictions in the candidates' `forecasts.csv`
-artifacts gives:
+bound and at least 3 complaints. `detect` ran with the champion on 2026-10-19 (rows created at 18:24 UTC)
+and evaluated the 12 complete weeks after the training cut, 2026-07-20 to 2026-10-05: 20 components by
+12 weeks, 240 component-weeks. These are the same weeks as backtest fold 3, so the checks below confirm
+the stored champion reproduces the backtest; they are not a second, independent test. The stored
+out-of-sample rows reproduce the holdout WAPE: 50.33 over 649 complaints (query on `forecasts` where
+`is_holdout = 1`).
 
-| Model | Component-weeks | Flags | Share |
-|---|---|---|---|
-| glm_poisson | 240 | 18 | 7.5% |
-| ses | 240 | 14 | 5.8% |
+### Alerts
 
-With a central 90% interval, about 5% of component-weeks would exceed the upper bound by chance alone,
-so most of these flags are expected noise rather than defect clusters. Repeated flags on one component
-(SUSPENSION four times and STEERING three times under `glm_poisson`) are the stronger signal.
+| Item | Value | Source |
+|---|---|---|
+| Alerts stored | 18 of 240 component-weeks (7.5%) | `spike_alerts` (18 rows, weeks 2026-07-20 to 2026-10-05); `logs/forecast_detect.log` |
+| Current alerts (last 4 complete weeks, 2026-09-14 to 2026-10-05) | 8 | `RECENT_WEEKS = 4` in `pipelines/forecast.py`; `logs/forecast_detect.log`; count by week in `spike_alerts` |
+| Repeated components | SUSPENSION 4 alerts, STEERING 3, POWER TRAIN 2, VEHICLE SPEED CONTROL 2 | `spike_alerts` |
+| Backtest cross-check | the rule applied to the holdout rows of the champion run's `forecasts.csv` gives the same 18 flags; `ses` gives 14 (5.8%) | artifacts of runs `98acce0d6c244ef9a75db49e2e9a1ea5` and `c9d72cda6f724f50b20434e6cf678d95` |
 
-Alert precision (share of alerts followed or preceded by a related recall within 28 days, compared with
-the base rate over all evaluated component-weeks) is computed by `detect`: measured in the `detect`
-console output and `spike_alerts` (pending).
+| Component | Week | Actual | Forecast | Upper | Current | Same-component recall near (pipeline definition) |
+|---|---|---|---|---|---|---|
+| AIR BAGS | 2026-07-20 | 4 | 1.02 | 3 | no | 26V545000 (report date 2026-08-21) |
+| SUSPENSION | 2026-07-27 | 7 | 1.24 | 3 | no | |
+| VEHICLE SPEED CONTROL | 2026-07-27 | 6 | 1.71 | 4 | no | |
+| STEERING | 2026-08-03 | 8 | 3.64 | 7 | no | |
+| SUSPENSION | 2026-08-03 | 15 | 1.86 | 4 | no | 26V558000 (2026-09-01) |
+| FORWARD COLLISION AVOIDANCE | 2026-08-10 | 7 | 3.24 | 6 | no | |
+| STEERING | 2026-08-10 | 9 | 4.39 | 8 | no | |
+| FUEL/PROPULSION SYSTEM | 2026-08-17 | 4 | 0.64 | 2 | no | |
+| STEERING | 2026-08-24 | 10 | 5.21 | 9 | no | |
+| SUSPENSION | 2026-08-31 | 7 | 2.89 | 6 | no | 26V558000 (2026-09-01) |
+| POWER TRAIN | 2026-09-14 | 10 | 4.36 | 8 | yes | |
+| OTHER | 2026-09-21 | 10 | 4.22 | 8 | yes | 26V571000 (2026-09-02) |
+| VEHICLE SPEED CONTROL | 2026-09-21 | 7 | 2.07 | 5 | yes | |
+| VISIBILITY/WIPER | 2026-09-21 | 4 | 1.28 | 3 | yes | |
+| POWER TRAIN | 2026-09-28 | 11 | 5.24 | 9 | yes | |
+| BACK OVER PREVENTION | 2026-10-05 | 3 | 0.73 | 2 | yes | 26V597000 (2026-09-16) |
+| ENGINE | 2026-10-05 | 3 | 0.56 | 2 | yes | 26V659000 (2026-10-07) |
+| SUSPENSION | 2026-10-05 | 6 | 2.36 | 5 | yes | |
 
-## 5. What is pending
+Source: `logs/forecast_detect.log` (the `spike_alerts` table stores actual, upper and ratio but not the
+point forecast); recall report dates from the `recalls` table.
 
-| Item | Where it will be recorded |
+With a central 90% interval, about 5% of component-weeks (about 12 of 240) would exceed the upper bound by
+chance alone, so most alerts are expected noise rather than defect clusters. Repeated alerts on one
+component are the stronger signal.
+
+### Interval coverage on out-of-sample weeks
+
+Computed from the `forecasts` table as the share of rows with `actual` not null and `week` after the
+champion's `train_end_week` (2026-07-13) for which `lower <= actual <= upper`:
+
+| Item | Value |
 |---|---|
-| A completed `train` run with all seven nested runs and a logged model | MLflow experiment `vsia-forecast` |
-| Champion model version, family, holdout WAPE, ratio to seasonal naive | model version description and tags (`holdout_wape_1step`, `rel_wape_vs_snaive_1step`, `beats_seasonal_naive_1step`) |
-| Stored forecasts and spike alerts, interval coverage on out-of-sample weeks, alert recall-proximity rate | `forecasts`, `spike_alerts`, `detect` output |
-| Update of this report's tables if the re-run changes any value | this file |
+| Inside the 90% interval | 218 of 240 (0.908), matching `logs/forecast_detect.log` |
+| Below the lower bound | 3 |
+| Above the upper bound | 19 (18 of them with at least 3 complaints, which are the alerts) |
+
+Overall coverage is close to the 0.90 nominal, but the misses are lopsided: 19 above and 3 below, against
+about 12 expected on each side of a central 90% interval. This is consistent with weekly counts being more
+variable upward than the Poisson interval assumes, which also explains why alerts (7.5%) exceed the 5%
+chance rate.
+
+### Do alerts anticipate recalls?
+
+For each alert, the check asks whether a recall in the `recalls` table (200 campaigns, report dates
+2020-11-12 to 2026-10-07) on an overlapping component was reported near the alert week. The base rate
+applies the same check to all 240 out-of-sample component-weeks. Recall rows were de-duplicated by
+campaign. Two definitions were computed with a read-only script on `data/vsia.db`:
+
+- **A, pipeline definition** (`near_recall()` in `pipelines/forecast.py`, `RECALL_WINDOW_DAYS = 28`):
+  `recalls.component_primary` equals the alert component, and the report date falls between 28 days
+  before the week start and 28 days after the week end (week start plus 34 days).
+- **B, symmetric definition**: `recalls.component_primary` or the first colon-separated segment of
+  `recalls.component_raw` equals the alert component, and the report date is within plus or minus 28
+  days of the week start. In practice the `component_raw` segment added no alert matches; the narrower
+  window is what changes the result.
+
+| Definition | Alerts with a recall near | Base rate, all 240 component-weeks | Base rate, 222 non-alert component-weeks | Chance of at least this many by luck (binomial at the base rate) |
+|---|---|---|---|---|
+| A, pipeline | 6 of 18 (0.333) | 73 of 240 (0.304) | 67 of 222 (0.302) | 0.48 |
+| B, symmetric | 4 of 18 (0.222) | 68 of 240 (0.283) | 64 of 222 (0.288) | 0.80 |
+
+Definition A reproduces the `detect` log (6 of 18 against a base rate of 0.304). Restricting the base rate
+to the 11 components that had alerts gives 0.318 under A and 0.280 under B. The binomial figure is only a
+rough guide, because component-weeks are not independent: one recall matches about nine consecutive weeks
+of its component under definition A.
+
+Timing of the six matches under definition A, relative to the alert week start: two recalls came before
+the alert (OTHER, 26V571000, 19 days earlier; BACK OVER PREVENTION, 26V597000, 19 days earlier), two fell
+inside the alert week (SUSPENSION on 2026-08-31, 1 day later; ENGINE on 2026-10-05, 2 days later), and two
+came about a month later (SUSPENSION on 2026-08-03, 29 days later; AIR BAGS on 2026-07-20, 32 days
+later). Both SUSPENSION matches point to the same recall, 26V558000. Only two alerts led a recall by more
+than a week, and both fall outside a symmetric 28-day window.
+
+**Conclusion:** on this data, spike alerts do not anticipate recalls. The share of alerts near a recall
+(0.333 or 0.222, depending on the definition) is no higher than the base rate for ordinary component-weeks
+(0.304 or 0.283). With 18 alerts the check has little power, and recall report dates reflect manufacturer
+filing schedules, so this is weak evidence either way. It does not support presenting alerts as early
+warnings of recalls; they remain "more complaints than expected" signals for an analyst to investigate.
+
+## 5. Open items
+
+| Item | Status |
+|---|---|
+| Interval coverage and alert behaviour on weeks after 2026-10-05 | not yet measured; needs later `detect` runs once those weeks are complete. The 80 future rows (2026-10-12 to 2026-11-02) have no actuals yet |
+| Refit of the champion on all 249 weeks | not done: the registered model is the one fitted for the holdout fold (`train_end_week` 2026-07-13), and no decision record covers refitting before serving |
+| A stronger external check for alerts (for example, longer windows or NHTSA investigation openings) | not yet measured |
+| Registry-eligible models against simple baselines | open: SES and the 4-week moving average had lower validation WAPE than the champion (section 3) |
 
 ## 6. How to reproduce
 

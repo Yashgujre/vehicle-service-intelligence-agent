@@ -3,13 +3,19 @@
 The Streamlit dashboard is the operations, review and evaluation view over the project database. Code is in
 `app/`: `streamlit_app.py` is the entrypoint, `views/` holds one script per page, `data.py` is the read layer
 and `ui.py` holds shared helpers. Decisions: ADR-0071 (Streamlit), ADR-0072 (demo snapshot), ADR-0073
-(review UI), ADR-0074 (caching).
+(review UI), ADR-0074 (caching), ADR-0088 to ADR-0092 (hosted interactive demo). `hosted.py` holds the
+hosted demo support: data bundle bootstrap, AI model picker and quota guard.
 
 ## Pages and data sources
 
+Navigation has two groups: "Try it" (Try the agent, Ask the data) and "Operate" (the six original pages).
+"Try the agent" is the default page.
+
 | Page (URL) | Panel | Source |
 |---|---|---|
-| Overview (`/`) | KPIs: complaints, last ingestion run and rows inserted, triaged, auto-routed %, pending reviews, active spike alerts, LLM calls, LLM cost to date, cost per 1,000 triaged | `complaints`, `ingestion_runs`, `triage_records`, `review_queue`, `spike_alerts` + `forecasts`, `vsia.observability.cost_latency_summary()` |
+| Try the agent (`/try`, default) | Pick a real complaint (make, model, "crash or fire only" filter, random pick) or write one (three examples: brake failure, personal details, prompt injection); runs `vsia.agent.triage()` and shows route, component, severity, calibrated confidence against the threshold, review reasons, NHTSA's own coding for comparison (hidden from the model), linked recalls, extracted fields and a seven-step trace (redaction, injection check, recall tools, model call, grounding, severity rule, confidence and route) | `complaints`, `recalls`; writes `triage_records` and `review_queue` for picked complaints only (run id `playground-<session>`); written complaints are not persisted |
+| Ask the data (`/ask`) | RAG chat with four example questions (one out of scope); answers link cited recalls; caption shows intent, filters, verified citations and latency. With the offline option it lists the most relevant retrieved sources without an AI-written answer | `vsia.rag.answer()`; `vsia.retrieval.search_sources()` offline; conversation kept in session state only |
+| Overview (`/overview`) | KPIs: complaints, last ingestion run and rows inserted, triaged, auto-routed %, pending reviews, active spike alerts, LLM calls, LLM cost to date, cost per 1,000 triaged | `complaints`, `ingestion_runs`, `triage_records`, `review_queue`, `spike_alerts` + `forecasts`, `vsia.observability.cost_latency_summary()` |
 | | Weekly complaint volume (weeks start Monday, as in the forecast pipeline; the trailing partial week is dropped) and top components | `complaints` (NHTSA-coded `component_primary`, shown as reference data, never model input) |
 | | Filters: make, model year, date filed | in-memory filter on the cached complaints frame |
 | Triage queue (`/triage`) | Latest triage record per complaint (toggle shows all runs) joined to vehicle fields; filters; detail panel with redacted complaint text, structured output, confidence signals, review reasons and cited recalls linked to `https://www.nhtsa.gov/recalls?nhtsaId=<campaign>` | `triage_records`, `complaints`, `recalls` |
@@ -51,7 +57,46 @@ stores already-redacted text.
 3. **empty**, when neither is available. Every page shows its "no data yet" state.
 
 Writes happen only in live mode with `VSIA_READONLY` unset. Demo mode is always read-only. The sidebar
-shows the active mode and the snapshot export time.
+shows the active mode and the snapshot export time. "Try the agent" and "Ask the data" need live mode; in
+demo mode they show a warning and stop.
+
+## Hosted demo: bootstrap, AI model picker and quota guard
+
+These run only when the app is deployed as the hosted demo (ADR-0089); local runs are unchanged.
+
+**Bootstrap** (`hosted.bootstrap()`, called by `streamlit_app.py` before the data source is resolved).
+When `VSIA_BUNDLE_URL` is set, it sets `VSIA_EMBED_PROVIDER=fastembed` (ADR-0090) and, if `data/vsia.db`
+and the bundle marker are missing, downloads the demo data bundle, checks it against `VSIA_BUNDLE_SHA256`
+and unpacks only regular files and directories under `data/` (`vsia.bundle.ensure`, ADR-0091). The data
+source then resolves to live mode against the bundled SQLite database. Without `VSIA_BUNDLE_URL` the app
+falls back to the snapshot rules above.
+
+**AI model picker** (`hosted.model_picker()`, in the sidebar of both "Try it" pages). Options, in order:
+
+| Option | When offered | Source label |
+|---|---|---|
+| Google Gemini, free (shared key) | `GEMINI_API_KEY` is set | hosted |
+| Groq, free (shared key) | `GROQ_API_KEY` is set | hosted |
+| Anthropic Claude or OpenAI (host key) | The host set that key | hosted |
+| Ollama, local model | An Ollama server answers (development) | local |
+| Use my own API key | Always | own: provider choice (Gemini, Groq, OpenAI, Anthropic) and a password field; with no key entered, requests fall back to the offline classifier |
+| Offline classifier (no AI call) | Always | offline: provider `heuristic`, the TF-IDF baseline |
+
+A visitor's key lives only in that browser session's state and is passed per request through
+`vsia.llm.use_keys()`; it is never written to the database, logs or `llm_calls` (ADR-0092). On the triage
+page, when the shared Gemini key answers 429 and `GROQ_API_KEY` exists, the run is retried once on Groq
+and the page says so. Any other AI failure shows the agent's designed failure mode: offline classifier
+output, routed to human review, with the reason.
+
+**Quota guard** (`hosted.quota_block()`, ADR-0092). Applies only to the shared key:
+
+- at most 15 AI calls per browser session (`SESSION_AI_RUNS`); a triage run counts one call and a chat
+  question two (plan and answer);
+- at most `VSIA_HOSTED_DAILY_LLM_CALLS` calls (default 400) per provider per day, counted from `llm_calls`
+  since midnight Pacific, when Gemini quotas reset.
+
+When a cap is hit the page explains why and offers the visitor's own key or the offline classifier. The
+sidebar shows how many shared calls the session has left.
 
 ### Demo snapshot
 
@@ -107,6 +152,12 @@ pytest tests/test_app_data.py
 
 ## Deploy to Streamlit Community Cloud
 
+The shareable deployment is the interactive hosted demo: follow
+[the hosted demo runbook](../operations/runbooks/hosted-demo.md) (Gemini key, data bundle release asset,
+secrets `GEMINI_API_KEY`, optional `GROQ_API_KEY`, `VSIA_BUNDLE_URL`, `VSIA_BUNDLE_SHA256`, optional
+`VSIA_HOSTED_DAILY_LLM_CALLS`). The steps below deploy the read-only snapshot, which remains the fallback
+(ADR-0072, refined by ADR-0089); steps 3, 5 and 6 apply to both.
+
 1. Export and commit the snapshot (`python scripts/export_demo_snapshot.py`), after checking
    `app/demo_data/manifest.json`.
 2. In Community Cloud, create an app from the repository, set the entrypoint to `app/streamlit_app.py`, and
@@ -116,23 +167,29 @@ pytest tests/test_app_data.py
    `pyproject.toml`). `app/requirements.txt` therefore wins over the root `pyproject.toml`, which would
    otherwise be read as a Poetry file. It is a copy of `requirements-streamlit.txt` (pinned:
    `streamlit==1.66.0`, `plotly`, `pandas`, `pyarrow`, `sqlalchemy`, `pydantic`, `pydantic-settings`,
-   `pyyaml`, `numpy`). A test keeps the two files identical.
-4. Secrets: paste TOML into Advanced settings. Never commit `.streamlit/secrets.toml`. For the public demo:
+   `pyyaml`, `numpy`, plus `httpx`, `tenacity`, `scikit-learn`, `joblib`, `rank-bm25` and `fastembed` for
+   the in-process agent, ADR-0089). A test keeps the two files identical.
+4. Secrets: paste TOML into Advanced settings. Never commit `.streamlit/secrets.toml`. For a snapshot-only
+   deployment:
 
    ```toml
    VSIA_DEMO_SNAPSHOT = "1"
    VSIA_READONLY = "1"
    ```
 
-   Root-level secrets are also exposed as environment variables, which is how `app/data.py` reads them. No
-   API keys are needed because the dashboard makes no LLM calls.
+   Root-level secrets are also exposed as environment variables, which is how `app/data.py` reads them. A
+   snapshot-only deployment needs no API keys; the "Try it" pages then show a warning instead of running.
 5. Theme: only the repository-root `.streamlit/config.toml` is read, including on Community Cloud.
 6. Sleep: an app with no traffic for 12 hours goes to sleep, and the next visitor must click "Yes, get this
    app back up!" and wait for a cold start. Open the app shortly before a demo.
 
 ## Known limits
 
-- Streamlit has no authentication. Run the writable mode only locally or on a private network.
-- Demo data is as old as the last export.
-- `docs/architecture/deployment.md` describes the dashboard as reading the VM API. The current design reads
-  the database or the snapshot (ADR-0072). That row should be updated by the infrastructure workstream.
+- Streamlit has no authentication. Run the writable mode only locally or on a private network. The hosted
+  demo is the deliberate exception: its database is public demo data, shared by visitors and reset on
+  restart, so open review writes are accepted (ADR-0089).
+- Demo data is as old as the last export or the last bundle.
+- Hosted demo memory use, cold-start time and latency on Community Cloud are not yet measured; the page
+  timings above are from the laptop and predate the "Try it" pages.
+- `docs/architecture/deployment.md` describes the dashboard as reading the database or the snapshot, which
+  matches the code, and no longer lists `VSIA_API_TOKEN` as a Streamlit secret.

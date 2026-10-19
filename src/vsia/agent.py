@@ -122,6 +122,7 @@ def triage(c: Complaint, *, provider: str | None = None, model: str | None = Non
         except llm.LLMError as e:
             llm_failed = True
             signals["llm_error"] = str(e)[:300]
+            signals["llm_status"] = e.status
             out = _heuristic_output(c, probs, red.text)
 
     # Semantic validation: taxonomy membership and citation grounding.
@@ -167,7 +168,7 @@ def triage(c: Complaint, *, provider: str | None = None, model: str | None = Non
     if llm_failed:
         reasons.append("LLM call failed or output invalid twice")
     if conf < threshold:
-        reasons.append(f"confidence {conf:.2f} below threshold {threshold:.2f}")
+        reasons.append(f"confidence {conf:.3f} below threshold {threshold:.3f}")
     route = "review" if reasons else "auto"
     signals["review_reasons"] = reasons
 

@@ -67,6 +67,7 @@ Rules:
 | [0052](0052-rolling-origin-backtest-and-wape-selection.md) | Select the forecaster by mean validation WAPE over three rolling origins; report MASE and a 12-week holdout | forecasting | Accepted |
 | [0053](0053-mlflow-registry-champion-alias-and-fingerprint-skip.md) | Serve the forecaster through an MLflow registry alias and skip retraining when the data fingerprint is unchanged | forecasting | Accepted |
 | [0054](0054-spike-alert-rule-from-prediction-interval.md) | Flag a spike when the weekly count exceeds the 90% interval upper bound and is at least 3 | forecasting | Accepted |
+| [0055](0055-cloudpickle-for-forecaster-artifacts.md) | Log the forecaster with cloudpickle, not skops, and load only models this pipeline wrote | forecasting | Accepted |
 
 ## 0060-0069: triage agent and human review
 
@@ -84,7 +85,7 @@ Rules:
 | ADR | Title | Component | Status |
 |---|---|---|---|
 | [0071](0071-streamlit-for-the-dashboard.md) | Build the dashboard in Streamlit with Plotly, as a native multipage app | dashboard | Accepted |
-| [0072](0072-demo-snapshot-for-public-dashboard.md) | Serve the public dashboard from a redacted parquet snapshot, not a live database | dashboard | Accepted |
+| [0072](0072-demo-snapshot-for-public-dashboard.md) | Serve the public dashboard from a redacted parquet snapshot, not a live database | dashboard | Accepted; refined by ADR-0089 (snapshot is now the fallback) |
 | [0073](0073-review-ui-inside-the-dashboard.md) | Put the human review form inside the dashboard, writing through vsia.review.decide | dashboard, review | Accepted |
 | [0074](0074-dashboard-caching-policy.md) | Cache narrow read queries for five minutes and aggregate in pandas | dashboard | Accepted |
 | [0075](0075-n8n-workflows-call-the-api-native-agent-is-a-variant.md) | Keep n8n workflows as thin API clients; ship the n8n-native agent as a comparison variant | n8n orchestration | Accepted |
@@ -104,6 +105,16 @@ Rules:
 | [0085](0085-cloud-init-bootstrap-secrets-over-ssh.md) | Bootstrap the VM with cloud-init; deliver secrets over SSH with a deploy script | infra | Accepted |
 | [0086](0086-one-postgres-instance-per-service-databases.md) | Share one Postgres 16 instance with a database and role per service | infra | Accepted |
 | [0087](0087-pinecone-index-managed-by-terraform.md) | Create the Pinecone index with Terraform | infra | Accepted |
+
+## 0088-0099: shareable hosted demo
+
+| ADR | Title | Component | Status |
+|---|---|---|---|
+| [0088](0088-free-tier-llm-for-the-hosted-demo.md) | Use free-tier Gemini for the hosted demo, with Groq as backup, visitor keys and an offline mode | LLM gateway, hosted demo | Accepted |
+| [0089](0089-hosted-interactive-demo-on-streamlit-community-cloud.md) | Host an interactive demo on Streamlit Community Cloud that runs the agent in-process | dashboard, hosted demo | Accepted |
+| [0090](0090-in-process-onnx-embedder-for-the-hosted-demo.md) | Embed queries in-process with the same nomic model (ONNX), not a hosted embedding API | retrieval | Accepted |
+| [0091](0091-demo-data-bundle-as-release-asset.md) | Ship the demo data as a checksummed release asset, not in Git | hosted demo, data | Accepted |
+| [0092](0092-quota-guard-and-visitor-key-handling.md) | Cap shared free-tier use per session and per day; keep visitor keys in the session only | hosted demo, security | Accepted |
 
 ## Notes
 

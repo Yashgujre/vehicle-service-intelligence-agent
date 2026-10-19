@@ -4,13 +4,18 @@ This page describes where each part of VSIA runs, how the parts reach each other
 budgeted on the free VM, how secrets and backups are handled, and which parts have and have not been
 exercised. Infrastructure code: `infra/compose/`, `infra/terraform/`, `Dockerfile`, `scripts/deploy_vm.sh`.
 
-## Three run modes
+The OCI VM design below is unchanged. The shareable path is the free hosted demo on Streamlit Community
+Cloud (ADR-0088 to ADR-0092), described in [Hosted demo](#hosted-demo-streamlit-community-cloud) at the end
+of this page.
+
+## Run modes
 
 | Mode | Where | Database | LLM | Vector store | Orchestration | Chat UI |
 |---|---|---|---|---|---|---|
 | Laptop development (ADR-0008) | Native Python in `.venv` | SQLite `data/vsia.db` | Ollama `qwen2.5:3b` (default) or hosted APIs | Local index `data/index/` | CLI and `uvicorn vsia.api:app` | `vsia chat` CLI |
 | OCI VM (this page) | Docker Compose on one Always Free A1 VM | Postgres 16 | Anthropic `claude-haiku-5-5` (or OpenAI) | Pinecone | n8n | Open WebUI |
-| Dashboard | Streamlit Community Cloud | Reads the redacted parquet demo snapshot in `app/demo_data/` (ADR-0072); on the VM it can read Postgres directly | n/a | n/a | n/a | Streamlit app |
+| Hosted demo (ADR-0089) | Streamlit Community Cloud; the agent and RAG chat run in-process inside the Streamlit app | Shared, ephemeral SQLite `data/vsia.db` unpacked from the redacted demo bundle (ADR-0091) | Gemini `gemini-2.5-flash-lite` free tier, Groq `openai/gpt-oss-20b` backup, visitor's own key, or the offline classifier (ADR-0088) | Local index from the bundle; queries embedded in-process with fastembed (ADR-0090) | none | Streamlit "Ask the data" page |
+| Dashboard snapshot (fallback) | Streamlit Community Cloud, or any host without a database | Reads the redacted parquet demo snapshot in `app/demo_data/` (ADR-0072); used when `VSIA_BUNDLE_URL` is unset or no database is reachable | n/a | n/a | n/a | Streamlit app, read-only |
 
 ## C4 deployment diagram
 
@@ -50,7 +55,7 @@ flowchart LR
     nhtsa["NHTSA API<br/>api.nhtsa.gov"]
     llm["Anthropic / OpenAI APIs"]
     pine["Pinecone serverless<br/>aws us-east-1, llama-text-embed-v2"]
-    st["Streamlit Community Cloud<br/>dashboard"]
+    st["Streamlit Community Cloud<br/>hosted demo (see below)"]
   end
 
   user(["Analyst / reviewer"]) -->|"HTTPS 443"| caddy
@@ -103,7 +108,7 @@ limits, and the hosted APIs cost cents for this workload (research section 8.2).
 | Secret | Lives in | Never in |
 |---|---|---|
 | Provider keys (Anthropic, OpenAI, Pinecone, LlamaParse) | `infra/compose/.env` on the VM (mode 600), laptop `.env` | Git, Terraform state, instance metadata, logs |
-| `VSIA_API_TOKEN` | `.env`; n8n Header Auth credential; Streamlit secrets | n8n expressions, Git |
+| `VSIA_API_TOKEN` | `.env`; n8n Header Auth credential | n8n expressions, Git, Streamlit secrets (the dashboard does not call the API) |
 | `N8N_BEARER` (webhook auth) | n8n Header Auth credential; Open WebUI pipe valve | Git |
 | `N8N_ENCRYPTION_KEY` | `.env` (must never change; back it up) | Git |
 | Postgres passwords | `.env`; applied by `postgres-init.sql` on first start | Git |
@@ -180,3 +185,67 @@ Not verified (nothing below has been run):
   `vsia-api`, and whether the `caddy:2-alpine` and `postgres:16-alpine` tags (not in the research file)
   match current releases.
 - The Open WebUI pipe inside a running Open WebUI, and end-to-end chat through n8n.
+
+## Hosted demo (Streamlit Community Cloud)
+
+The hosted demo is the free, shareable way to use VSIA: one link, no setup, zero cost to the owner. It does
+not replace the VM design above. The Streamlit app runs the same `vsia` package in-process, so visitors can
+triage a complaint, ask a question and work the review queue (ADR-0089). It refines ADR-0072: the public
+app is live rather than a read-only snapshot, and the parquet snapshot is now the fallback when no bundle is
+configured or no database is reachable. Deploy and operate it with
+[the hosted demo runbook](../operations/runbooks/hosted-demo.md).
+
+```mermaid
+flowchart LR
+  visitor(["Visitor browser"])
+  subgraph scc["Streamlit Community Cloud: one app container (about 2.7 GB memory, 2 CPU cores)"]
+    app["Streamlit app<br/>app/streamlit_app.py<br/>Try the agent, Ask the data,<br/>six dashboard pages"]
+    hosted["app/hosted.py<br/>bootstrap, AI model picker,<br/>quota guard"]
+    core["vsia.agent.triage, vsia.rag.answer<br/>in-process"]
+    embed["Query embedder<br/>fastembed, nomic-embed-text-v1.5 (ONNX)"]
+    sqlite[("data/vsia.db<br/>shared, ephemeral SQLite")]
+    files[("data/index, data/models<br/>from the bundle")]
+  end
+  gh["GitHub repository<br/>main branch"]
+  rel["GitHub release asset<br/>vsia-demo-bundle.tar.gz"]
+  gem["Google Gemini API<br/>gemini-2.5-flash-lite, free tier"]
+  groq["Groq API<br/>openai/gpt-oss-20b, free tier"]
+  paid["OpenAI / Anthropic APIs<br/>visitor's own key only"]
+
+  visitor -->|"HTTPS"| app
+  gh -->|"deploys from"| app
+  app --> hosted
+  app --> core
+  hosted -->|"first start: download,<br/>verify sha256, unpack data/ only"| rel
+  core --> sqlite
+  core --> files
+  core --> embed
+  core -->|"shared key or visitor key"| gem
+  core -->|"backup on 429 (triage page)"| groq
+  core -->|"visitor key"| paid
+```
+
+| Component | Where it runs | Secrets and settings | Notes |
+|---|---|---|---|
+| Streamlit app and pages | Community Cloud app container | none | Entrypoint `app/streamlit_app.py`; dependencies pinned in `app/requirements.txt` (a copy of `requirements-streamlit.txt`) |
+| Bootstrap (`hosted.bootstrap`, `vsia.bundle.ensure`) | In the app process, on first start | `VSIA_BUNDLE_URL`, `VSIA_BUNDLE_SHA256` | Downloads the bundle when `data/vsia.db` and the bundle marker are missing; sets `VSIA_EMBED_PROVIDER=fastembed` (ADR-0091) |
+| Triage agent and RAG chat | In the app process | Provider keys from secrets, or the visitor's key through `vsia.llm.use_keys()` | Same code as local development (ADR-0089) |
+| AI model picker and quota guard (`app/hosted.py`) | In the app process | `VSIA_HOSTED_DAILY_LLM_CALLS` (default 400) | 15 AI calls per session on the shared key (`SESSION_AI_RUNS`); daily cap counted from `llm_calls` since midnight Pacific (ADR-0092) |
+| Operational database | SQLite file inside the container | none | Shared by all visitors and reset when the app restarts; review writes are enabled because the runbook does not set `VSIA_READONLY` |
+| Vector index, classifier, calibrators, routing files | `data/` inside the container | none | Unpacked from the bundle |
+| Query embedder | In the app process | none | fastembed fp32 model (0.52 GB), downloaded on the first search after a cold start (ADR-0090) |
+| Demo data bundle | GitHub release asset | Checksum held in `VSIA_BUNDLE_SHA256` | Redacted database, three index namespaces, classifier and routing files; first build 62,837,362 bytes (ADR-0091) |
+| Google Gemini API | Google, OpenAI-compatible endpoint | `GEMINI_API_KEY`: the owner's free key, in a project with no billing account | Primary model (ADR-0088) |
+| Groq API | Groq, OpenAI-compatible endpoint | `GROQ_API_KEY` (optional) | Backup when Gemini answers 429 on the triage page |
+| Visitor's own key | That browser session's state only | none stored | Gemini, Groq, OpenAI or Anthropic; never written to the database, logs or `llm_calls` (ADR-0092) |
+
+Not part of the hosted demo: the VSIA API, n8n, Open WebUI, the MLflow UI, Postgres and Pinecone. They stay
+documented for the VM and run locally.
+
+Measured and not measured:
+
+- The bundle size and redaction count above come from the first build on 2026-10-19 (ADR-0091). The
+  embedder parity table is in ADR-0090.
+- The embedding model download took about 20 seconds measured locally on a home connection; on Community
+  Cloud it is not yet measured.
+- Memory use on Community Cloud, cold-start time and triage latency on the hosted app are not yet measured.

@@ -26,6 +26,8 @@ class Env(BaseSettings):
 
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
+    gemini_api_key: str | None = None
+    groq_api_key: str | None = None
     pinecone_api_key: str | None = None
     pinecone_index: str = "vsia"
     llama_cloud_api_key: str | None = None
@@ -33,6 +35,12 @@ class Env(BaseSettings):
 
     mlflow_tracking_uri: str = f"sqlite:///{DATA_DIR / 'mlflow.db'}"
     mlflow_artifact_root: str = str(DATA_DIR / "mlartifacts")
+
+    # Hosted demo (ADR-0089, ADR-0091): data bundle to fetch when data/ is empty, and the daily cap on
+    # LLM calls made with the host's own free-tier key.
+    vsia_bundle_url: str | None = None
+    vsia_bundle_sha256: str | None = None
+    vsia_hosted_daily_llm_calls: int = 400
 
 
 @lru_cache

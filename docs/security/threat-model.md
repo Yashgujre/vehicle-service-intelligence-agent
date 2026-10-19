@@ -7,9 +7,10 @@
   OWASP Top 10 for LLM Applications 2025, with a response per threat: mitigate, eliminate, transfer or
   accept. Process and section list follow `docs/research/01_documentation_process_research.md` (section
   (b) "Threat model" row and section (c) topic 10).
-- **System model:** `docs/security/data-flow-diagram.md` (flow ids F0 to F41, gaps G1 to G9)
+- **System model:** `docs/security/data-flow-diagram.md` (flow ids F0 to F54, gaps G1 to G12; the hosted
+  demo is F42 to F54)
 - **Related:** `docs/security/ai-risk-register.md` (risk ids R-xx), `docs/security/guardrails.md`,
-  `docs/security/pii-handling.md`, ADR-0020 to ADR-0026
+  `docs/security/pii-handling.md`, ADR-0020 to ADR-0026, ADR-0088 to ADR-0092 (hosted demo)
 
 The STRIDE-to-LLM mapping used here (for example prompt injection as Tampering and Elevation of
 Privilege) is this project's own; neither OWASP nor Microsoft publishes an official mapping table.
@@ -26,6 +27,9 @@ Privilege) is this project's own; neither OWASP nor Microsoft publishes an offic
   tools and triggers no side effects; it returns JSON that deterministic code validates and routes.
 - The repository is open source, so system prompts are public by design.
 - One operator runs the deployment. There is no multi-tenant data and no per-user authorisation.
+- The hosted demo on Streamlit Community Cloud (ADR-0089) is public and anonymous by design. Visitors share
+  one ephemeral SQLite database built from a redacted bundle, spend a shared free-tier model quota, and may
+  paste their own API key. Its threats are in TB-H.
 
 ## 2. Assets
 
@@ -42,6 +46,10 @@ Privilege) is this project's own; neither OWASP nor Microsoft publishes an offic
 | A9 | Evaluation ground truth (`components_raw`, `component_primary`) | Integrity: must never reach a triage prompt (label leakage, ADR-0005) | `complaints` |
 | A10 | Service availability on one 12 GB VM | Availability | ADR-0080 |
 | A11 | Audit trail (`llm_calls`, `ingestion_runs`, `confidence_signals`) | Integrity, non-repudiation | Postgres |
+| A12 | Hosted demo secrets: the owner's free `GEMINI_API_KEY` and optional `GROQ_API_KEY`; bundle URL and checksum | Confidentiality (keys), integrity (checksum) | Streamlit secrets |
+| A13 | Visitor-supplied API keys (Gemini, Groq, OpenAI, Anthropic) | Confidentiality | That browser session's state only |
+| A14 | Shared free-tier quota on the owner's key (Gemini 1,000 requests per day as listed in ADR-0088; app cap 400 per ADR-0092) | Availability of the demo | Provider project; counted in the demo's `llm_calls` |
+| A15 | Demo data bundle (redacted database, index, classifier, calibrators, routing files) | Integrity | GitHub release asset; container `data/` |
 
 ## 3. Trust boundaries
 
@@ -54,6 +62,7 @@ Privilege) is this project's own; neither OWASP nor Microsoft publishes an offic
 | TB-E | Application to vector stores (local index, Pinecone) and embedding model | F12 to F14, F32 to F35 |
 | TB-F | Application to persistent stores (Postgres, n8n DB, Open WebUI data, files) | F2, F5, F10, F22, F24, F27, F31, F41 |
 | TB-G | Logical boundary inside the model context: untrusted data versus instructions | F9, F36, F37, F25 |
+| TB-H | Hosted demo: anonymous visitor to the Streamlit app, the app to free-tier providers, and the release asset to the container | F42 to F54 |
 
 ## 4. STRIDE per trust boundary
 
@@ -140,30 +149,48 @@ that is tracked in the risk register for a future code or configuration change.
 | G-D1 | Denial of service | Long input inflates tokens | NHTSA narratives are bounded (longest loaded summary: 2,830 characters); search query truncated to 2,000 characters; document LLM input truncated to 12,000 characters; output caps 200 to 800 tokens | M | Low for NHTSA data; caller-supplied complaints and chat questions are not length-capped |
 | G-E1 | Elevation of privilege | Injection makes the model call tools or act | No tools in the Python path; workflow 05 tools are read-only `GET` calls with `maxIterations: 5` | E (Python), M (n8n) | Low |
 
+### TB-H: Hosted demo (Streamlit Community Cloud)
+
+The triage and chat guardrails in TB-C, TB-E and TB-G apply unchanged inside the hosted app; this table
+covers only what the hosted deployment adds.
+
+| ID | STRIDE | Threat | Controls in place | Response | Residual risk |
+|---|---|---|---|---|---|
+| H-S1 | Spoofing | Anyone uses the demo, and any visitor can type any reviewer name on the Human review page | None by design: public demo, public data, ephemeral database (ADR-0089) | A | Low. The hosted database is separate from the development database and is discarded on restart, so visitor decisions never reach the gold set or calibration |
+| H-T1 | Tampering | A replaced release asset or a man in the middle serves a malicious bundle: poisoned database or index, or a joblib classifier or calibrator that runs code when loaded | HTTPS download; sha256 compared with `VSIA_BUNDLE_SHA256`; extraction limited to regular files and directories under `data/`, rejecting absolute paths and `..` (`vsia.bundle._safe_members`); tests `test_bundle_rejects_paths_outside_data`, `test_bundle_build_redacts_and_ensure_installs` | M, action | Low when the checksum secret is set, as the runbook requires. Verification is skipped when `VSIA_BUNDLE_SHA256` is unset (gap G10) |
+| H-T2 | Tampering | Visitor free text (written complaint or chat question) carries a prompt injection, or visitors fill the shared database | Same guardrails as TB-G: redaction, `detect_injection` forcing review, `wrap_untrusted`, schema validation, grounding; inputs capped at 2,000 and 500 characters; written complaints run with `persist=False`, so they write no triage or review row; chat history stays in session state; picked complaints persist triage records derived from public, redacted text | M | Low. Visitor review decisions do persist in the shared database until restart (gap G11) |
+| H-R1 | Repudiation | Visitor actions cannot be attributed to a person | Triage records tagged `playground-<session>`; `llm_calls` metadata | A | Low; anonymity is intended for a public demo |
+| H-I1 | Information disclosure | A visitor's own API key leaks through logs, the database, error text or another session | Password field; kept in that browser session's state; passed per request through `vsia.llm.use_keys()`, a context variable reset when the block ends; keys travel only in request headers; never written to the database, logs or `llm_calls`; gateway error strings carry no request headers (ADR-0092); test `test_use_keys_overrides_environment_and_resets` | M | Low. The visitor must still trust the deployed code and Community Cloud; the key field tells them it is never stored or logged |
+| H-I2 | Information disclosure | The free-tier provider may use submitted content to improve its products (Google's free-tier terms, ADR-0088) | Only public NHTSA text after PII redaction is sent: the bundle database is redacted at build (RP9), triage redacts before the call (RP1), chat redacts the question (RP10); the "Write your own" tab tells visitors not to enter personal information | T, A | Low to medium: regex redaction misses some PII (R-02), and a visitor can ignore the warning |
+| H-I3 | Information disclosure | The owner's shared key leaks | Key only in Streamlit secrets; never shown in the UI; the runbook requires a project with no billing account, so a leaked key cannot incur charges; rotation steps in the runbook | M | Low |
+| H-D1 | Denial of service (denial of wallet on a free tier) | One visitor or a script uses up the shared daily quota, so later visitors get errors | Per-session cap of 15 AI calls and per-day cap of 400 calls per provider counted from `llm_calls` since midnight Pacific (ADR-0092); Groq backup on 429; visitor's own key; offline classifier; the agent's failure mode routes to review with the reason shown | M, action | Medium. New browser sessions bypass the session cap until the daily cap; the daily count lives in the ephemeral database and restarts at 0 after an app restart; the Groq retry is not counted (gap G12). No money is at risk on a project without billing |
+| H-D2 | Denial of service | The app hits the Community Cloud memory ceiling, sleeps, or cannot download the bundle | Runbook incidents table; reboot from Manage app; sleep page wakes the app | A | Medium. Memory use on Community Cloud is not yet measured; a failed bundle download or checksum mismatch stops the page with an error instead of falling back to the snapshot |
+| H-E1 | Elevation of privilege | A visitor gains code execution or file access in the container | No tools, shell or file upload; model output is data only; safe tar extraction (H-T1) | M | Low |
+
 ## 5. OWASP Top 10 for LLM Applications 2025
 
 | OWASP id | How it applies to VSIA | Controls in this code | Residual risk | Response |
 |---|---|---|---|---|
 | LLM01 Prompt Injection | Every complaint narrative and recall document is untrusted text that enters a prompt (indirect injection); chat questions are direct input | `guardrails.wrap_untrusted` (spotlighting, tag and special-token neutralisation); `guardrails.detect_injection` (15 weighted rules, noisy-OR, flag at 0.5) forcing review in `agent.triage`; security rules at the top of `prompts/triage_v1.md`; `TriageOutput.injection_suspected` forces review; deterministic validation of every output; no tools to abuse. ADR-0023, ADR-0024 | Medium. Heuristic detection misses paraphrase and non-English attacks; candidate recalls and RAG context are not neutralised (G3); OWASP itself states fool-proof prevention may not exist | M |
 | LLM02 Sensitive Information Disclosure | Narratives can contain names, phones, emails, addresses, VINs | `guardrails.redact` before LLM, embedding, document storage, search queries, dashboard and snapshot export; metadata-only `llm_calls`; `observability._scrub`. ADR-0020, ADR-0021, ADR-0022 | Medium: regex misses lowercase names, SSNs, non-US phones (see pii-handling.md section 7); RAG question not redacted (G1); heuristic symptom unredacted (G2); chat history retained (G4) | M, A |
-| LLM03 Supply Chain | Hosted models (Anthropic `claude-haiku-5-5`, OpenAI `gpt-6-luna`), local `qwen2.5:3b` and `nomic-embed-text` via Ollama, Pinecone `llama-text-embed-v2`, LlamaParse, Python packages, container images | Model ids pinned in `config/settings.yaml`; images pinned for n8n 2.43.7, MLflow v3.17.1, Open WebUI v0.12.3; no fine-tuned or third-party adapter weights; offline-first default path (ADR-0002) | Medium. Python dependencies use `>=` lower bounds with no lock file in the repo (`pyproject.toml`); `postgres:16-alpine` and `caddy:2-alpine` are floating tags; the `httpRequestTool` node type in workflow 05 is inferred, not verified (n8n README) | M, A |
+| LLM03 Supply Chain | Hosted models (Anthropic `claude-haiku-5-5`, OpenAI `gpt-6-luna`; Gemini `gemini-2.5-flash-lite` and Groq `openai/gpt-oss-20b` in the hosted demo), the fastembed ONNX model and the demo data bundle (H-T1), local `qwen2.5:3b` and `nomic-embed-text` via Ollama, Pinecone `llama-text-embed-v2`, LlamaParse, Python packages, container images | Model ids pinned in `config/settings.yaml`; images pinned for n8n 2.43.7, MLflow v3.17.1, Open WebUI v0.12.3; no fine-tuned or third-party adapter weights; offline-first default path (ADR-0002) | Medium. Python dependencies use `>=` lower bounds with no lock file in the repo (`pyproject.toml`); `postgres:16-alpine` and `caddy:2-alpine` are floating tags; the `httpRequestTool` node type in workflow 05 is inferred, not verified (n8n README) | M, A |
 | LLM04 Data and Model Poisoning | No LLM is trained or fine-tuned. Poisonable inputs: the complaint corpus (forecast and retrieval), the vector index, the TF-IDF classifier trained on NHTSA labels, the confidence calibrator, and review labels that feed the gold set | Index rebuilt from the database; review labels require the bearer token or the n8n webhook bearer; calibrator fitted on a held-out calibration split (`vsia.confidence.fit`); evaluation runs isolated from the review queue (ADR-0064) | Low to medium: a token holder can write arbitrary review labels; reviewer identity is unauthenticated | M, A |
 | LLM05 Improper Output Handling | Model output is persisted, returned by the API, rendered in Open WebUI and in the dashboard | Pydantic schema validation with one repair retry; taxonomy normalisation; citation grounding; parameterised SQL; dashboard escapes model text with `ui.escape_md` (`app/views/triage.py`, `app/views/review.py`); campaign numbers validated by pattern `^\d{2}[VEITC]\d{6}$` | Low to medium. The RAG `answer` text is returned and rendered as Markdown by `openwebui/vsia_pipe.py` `render_answer` without sanitisation; inline bracketed citations inside `answer` are not filtered, only the `citations` list is | M |
 | LLM06 Excessive Agency | An agent with write tools could alter records or call external systems | Fixed workflow (ADR-0060); both Python tools are read-only; `recall_lookup(live=False)` reads the local table by default; routing and persistence are deterministic code; workflow 05 tools are `GET` only, `maxIterations: 5`, and the database write is a fixed node | Low. Workflow 05 can call the public NHTSA API with model-chosen parameters (read-only) | E (Python), M (n8n) |
 | LLM07 System Prompt Leakage | The prompts are in a public repository | No credentials, keys, internal URLs or authorisation logic in any prompt; authorisation is enforced in `vsia.api.auth` and n8n, never by the prompt | None of consequence | A |
 | LLM08 Vector and Embedding Weaknesses | Pinecone or local index holds complaint and recall text | Single-tenant public data (no cross-tenant leakage possible); redaction before embedding; NHTSA labels excluded from the complaint index; separate indexes per embedding model (`vsia/retrieval.py` docstring); vehicle filters via `vehicle_keys` | Low: index poisoning (E-T1) | M, A |
 | LLM09 Misinformation | Wrong component, severity or recall link; invented counts or IDs in chat | `validate_citations` against the retrieved set (ADR-0025); component-overlap rule (ADR-0063); severity business rule (ADR-0062); calibrated confidence and review routing (ADR-0061); RAG out-of-scope refusal and SQL-computed counts for aggregate questions (ADR-0065); answer prompt forbids invented numbers | Medium until accuracy is measured: measured in docs/evaluation/ (pending) | M |
-| LLM10 Unbounded Consumption | Every `/chat` costs two LLM calls; every triage one call plus at most one repair retry | `max_output_tokens: 700` (triage), 200 (plan), 500 (answer), 800 (extraction); one repair retry; 3 transport attempts; cost per call in `llm_calls.cost_usd`; runbook `cost-spike.md`; Ollama `num_ctx: 4096` | Medium: no request rate limit; uncapped `limit`, `top_k` and question length on the API; caller can select the provider per request (`TriageRequest.provider`, `ChatRequest.provider`, forwarded by workflow 04) | M, action |
+| LLM10 Unbounded Consumption | Every `/chat` costs two LLM calls; every triage one call plus at most one repair retry | `max_output_tokens: 700` (triage), 200 (plan), 500 (answer), 800 (extraction); one repair retry; 3 transport attempts; cost per call in `llm_calls.cost_usd`; runbook `cost-spike.md`; Ollama `num_ctx: 4096`; hosted demo session and daily caps on the shared key (ADR-0092, H-D1) | Medium: no request rate limit on the API; uncapped `limit`, `top_k` and question length on the API; caller can select the provider per request (`TriageRequest.provider`, `ChatRequest.provider`, forwarded by workflow 04) | M, action |
 
 ## 6. Summary of responses
 
 | Response | Threat ids |
 |---|---|
 | Eliminate | C-E1, F-T1, G-E1 (Python path), LLM06 (Python path) |
-| Mitigate (in place) | A-S1, A-T1, B-S1, B-T1, C-S1, C-T1, C-R1, C-D1, D-S1, D-T1, D-T2, D-T4, D-R1, D-D1, E-S1, E-T1, E-I1, E-D1, F-S1, F-R1, F-D1, G-S1, G-T1, G-R1, G-D1 |
-| Transfer | C-I1 (provider data terms), D-T3 (NHTSA intake) |
-| Accept | A-I1, A-E1 (laptop), B-I2, D-I1, E-I2, G-I1, LLM07 |
-| Accept now, action tracked | A-S2, A-R1, A-I2, A-D1, B-I1, B-E1, F-I1, F-I2, gaps G1 to G8 |
+| Mitigate (in place) | A-S1, A-T1, B-S1, B-T1, C-S1, C-T1, C-R1, C-D1, D-S1, D-T1, D-T2, D-T4, D-R1, D-D1, E-S1, E-T1, E-I1, E-D1, F-S1, F-R1, F-D1, G-S1, G-T1, G-R1, G-D1, H-T2, H-I1, H-I3, H-E1 |
+| Transfer | C-I1 (provider data terms), D-T3 (NHTSA intake), H-I2 (free-tier provider terms) |
+| Accept | A-I1, A-E1 (laptop), B-I2, D-I1, E-I2, G-I1, LLM07, H-S1, H-R1, H-D2 |
+| Accept now, action tracked | A-S2, A-R1, A-I2, A-D1, B-I1, B-E1, F-I1, F-I2, H-T1, H-D1, gaps G1 to G8 and G10 to G12 |
 
 Each "action tracked" item has a row in `docs/security/ai-risk-register.md` with an owner role and status.
 
@@ -171,9 +198,11 @@ Each "action tracked" item has a row in `docs/security/ai-risk-register.md` with
 
 - The OCI tenancy, VM operating system hardening and SSH (`admin_cidr` only, ADR-0083 and ADR-0085) are
   covered by the infrastructure ADRs, not re-analysed here.
-- Provider-side security (Anthropic, OpenAI, Pinecone, LlamaCloud) is transferred to their terms.
-- Streamlit Community Cloud runs the demo snapshot, which is redacted at export
-  (`scripts/export_demo_snapshot.py`, ADR-0072).
+- Provider-side security (Anthropic, OpenAI, Google Gemini, Groq, Pinecone, LlamaCloud) is transferred to
+  their terms.
+- Streamlit Community Cloud runs the interactive hosted demo (ADR-0089, TB-H) on a bundle redacted at build
+  (`vsia.bundle.build`, ADR-0091). The demo snapshot, redacted at export (`scripts/export_demo_snapshot.py`,
+  ADR-0072), is the fallback. Community Cloud platform security is transferred to Streamlit.
 - No workflow in `workflows/n8n/` has been executed in a running n8n instance yet (n8n README, ADR-0008);
   n8n findings are from the exported JSON.
 
