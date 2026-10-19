@@ -69,7 +69,7 @@ else:
                                      name=f"{c['provider']} chosen threshold {c['threshold']:.3f}"))
     target = next((c.get("target_auto_accuracy") for c in curves if c.get("target_auto_accuracy")), None)
     if target:
-        fig.add_hline(y=target, line_dash="dot", line_color="#7A7A7A",
+        fig.add_hline(y=target, line_dash="dot", line_color=ui.NEUTRAL,
                       annotation_text=f"target auto-routed accuracy {target:.0%}")
     fig.update_layout(xaxis_title="Coverage (auto-routed share)", yaxis_title="Accuracy of auto-routed")
     ui.chart(ui.style(fig, height=400))

@@ -1,12 +1,21 @@
 # Streamlit reads only this file, at the repository root (also on Community Cloud).
+# With both [theme.light] and [theme.dark] defined, each visitor gets the theme that matches their system
+# setting and can switch in the app menu (Settings > Theme). Charts follow the active theme (app/ui.py).
 
 [theme]
-base = "light"
+font = "sans serif"
+
+[theme.light]
 primaryColor = "#1F4E79"
 backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F3F5F8"
 textColor = "#1A1D23"
-font = "sans serif"
+
+[theme.dark]
+primaryColor = "#6FA8DC"
+backgroundColor = "#0F1419"
+secondaryBackgroundColor = "#1A212B"
+textColor = "#E4E8EE"
 
 [client]
 toolbarMode = "viewer"

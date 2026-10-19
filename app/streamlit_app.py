@@ -44,5 +44,6 @@ nav = st.navigation(pages)
 with st.sidebar:
     st.markdown("### Vehicle Service Intelligence")
     st.caption("Defect intelligence for vehicle quality and service teams, on public NHTSA data.")
+    st.caption("Light or dark mode: open the menu at the top right and pick System, Light or Dark.")
 ui.sidebar_status(ui.source())
 nav.run()

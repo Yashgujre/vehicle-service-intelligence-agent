@@ -51,7 +51,7 @@ else:
     fut = g[~g["is_holdout"]]
     if not fut.empty:
         fig.add_vrect(x0=fut["week"].min() - pd.Timedelta(days=3), x1=fut["week"].max() + pd.Timedelta(days=3),
-                      fillcolor="#F3F5F8", line_width=0, layer="below", annotation_text="future",
+                      fillcolor=ui.SHADE, line_width=0, layer="below", annotation_text="future",
                       annotation_position="top left")
     fig.update_layout(yaxis_title="Complaints per week")
     ui.chart(ui.style(fig, height=380))

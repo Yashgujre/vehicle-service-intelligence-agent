@@ -9,10 +9,13 @@ import streamlit as st
 
 import data
 
-PRIMARY = "#1F4E79"
-ACCENT = "#C8553D"
-BAND = "rgba(31, 78, 121, 0.15)"
-SEQUENCE = ["#1F4E79", "#C8553D", "#2E8B57", "#8E6C8A", "#D4A017", "#4F9FBF", "#7A7A7A", "#A23B72"]
+# Mid-luminance colours stay legible on both the light and the dark theme.
+PRIMARY = "#3A7BC8"
+ACCENT = "#D9644A"
+BAND = "rgba(58, 123, 200, 0.18)"
+SHADE = "rgba(128, 128, 128, 0.12)"
+NEUTRAL = "#8A8F98"
+SEQUENCE = ["#3A7BC8", "#D9644A", "#3BA36B", "#A07CC0", "#D4A017", "#4FB0C6", "#8A8F98", "#C9558F"]
 
 
 @st.cache_resource(ttl=data.CACHE_TTL_S, show_spinner=False)
@@ -57,17 +60,17 @@ def escape_md(text: str) -> str:
 
 
 def style(fig: go.Figure, height: int = 360, legend: bool = True) -> go.Figure:
-    fig.update_layout(height=height, margin=dict(l=60, r=20, t=60, b=50), colorway=SEQUENCE,
-                      plot_bgcolor="white", paper_bgcolor="white", showlegend=legend,
+    """Layout only: backgrounds, font colour and grid come from the active Streamlit theme (light or dark)."""
+    fig.update_layout(height=height, margin=dict(l=60, r=20, t=60, b=50), colorway=SEQUENCE, showlegend=legend,
                       legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, title=None),
                       font=dict(size=12), title=dict(x=0, xanchor="left", font=dict(size=15)))
-    fig.update_xaxes(showgrid=False, linecolor="#D0D4DA", automargin=True)
-    fig.update_yaxes(gridcolor="#ECEFF3", zeroline=False, automargin=True)
+    fig.update_xaxes(showgrid=False, automargin=True)
+    fig.update_yaxes(zeroline=False, automargin=True)
     return fig
 
 
 def chart(fig: go.Figure, key: str | None = None) -> None:
-    st.plotly_chart(fig, width="stretch", theme=None, key=key,
+    st.plotly_chart(fig, width="stretch", theme="streamlit", key=key,
                     config={"displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]})
 
 

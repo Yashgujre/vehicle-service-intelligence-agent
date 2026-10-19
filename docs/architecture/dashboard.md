@@ -179,7 +179,12 @@ secrets `GEMINI_API_KEY`, optional `GROQ_API_KEY`, `VSIA_BUNDLE_URL`, `VSIA_BUND
 
    Root-level secrets are also exposed as environment variables, which is how `app/data.py` reads them. A
    snapshot-only deployment needs no API keys; the "Try it" pages then show a warning instead of running.
-5. Theme: only the repository-root `.streamlit/config.toml` is read, including on Community Cloud.
+5. Theme: only the repository-root `.streamlit/config.toml` is read, including on Community Cloud. It defines
+   `[theme.light]` and `[theme.dark]`, so each visitor starts in the theme that matches their system setting
+   and can switch between System, Light and Dark in the top-right menu. Streamlit has no per-visitor theme
+   API, so there is no in-page toggle; a server-side switch would change the theme for every visitor. Charts
+   use `theme="streamlit"` and set no background or font colours (`app/ui.py`), so they follow the active
+   theme; the series palette uses mid-luminance colours that read on both backgrounds.
 6. Sleep: an app with no traffic for 12 hours goes to sleep, and the next visitor must click "Yes, get this
    app back up!" and wait for a cold start. Open the app shortly before a demo.
 
