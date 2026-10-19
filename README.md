@@ -73,7 +73,8 @@ the [gold-set datasheet](docs/data/datasheet-gold-set.md)).
 | Forecast, 12-week holdout | Poisson GLM champion, WAPE 50.33% vs 65.95% for seasonal naive | [backtest](docs/models/backtest-report.md) |
 | Spike alerts | 18 alerts; 6 of 18 within 28 days of a recall vs a 0.304 base rate, so alerts flag volume, not recalls | same |
 | PII | 94 matches in 75 of 10,303 complaints (0.73%), redacted before any model, index or log | [PII handling](docs/security/pii-handling.md) |
-| LLM triage (Ollama, Gemini) | being measured | `python -m eval.run_eval all --provider <p>` |
+| LLM triage, local `qwen2.5:3b`, gold split (200) | primary accuracy 0.405 (below the baseline); calibrated routing auto-routes 27.5% at 0.964 accuracy (threshold 0.775); recall citations hit a known recall in 38.7% of cases; median 33 s per complaint on a laptop | [comparison](docs/evaluation/model-comparison.md), [report](docs/evaluation/reports/2026-10-19-ollama-gold.md) |
+| LLM triage, Gemini free tier | being measured | `python -m eval.run_eval all --provider gemini` |
 
 ## Run it locally
 
