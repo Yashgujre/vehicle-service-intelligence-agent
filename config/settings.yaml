@@ -1,0 +1,124 @@
+# Domain and runtime configuration. Everything domain-specific lives here so the
+# pipeline can be forked to another domain (insurance claims, support tickets,
+# healthcare referrals) by swapping this file, the loaders and the prompts.
+
+domain:
+  name: vehicle_defects
+  record_noun: complaint
+
+segment:
+  description: "Electric and hybrid SUVs and pickups, model years 2021-2026, complaints filed 2022-01-01 onward"
+  model_years: [2021, 2022, 2023, 2024, 2025, 2026]
+  filed_from: "2022-01-01"
+  # Each entry: make plus regex patterns matched against NHTSA model strings
+  # returned by /products/vehicle/models?issueType=c. Aliases are tried verbatim.
+  # Canonical model names (from complaint product records) dropped after load: plain ESCAPE mixes
+  # gas and hybrid trims, and one-off records outside the segment add noise.
+  exclude_models: ["ESCAPE", "ROBOTAXI (MODEL Y)"]
+  vehicles:
+    - make: FORD
+      patterns: ["MACH-E", "LIGHTNING", "ESCAPE (HEV|PHEV)", "MAVERICK HEV"]
+      aliases: ["MUSTANG MACH-E", "F-150 LIGHTNING"]
+    - make: TESLA
+      patterns: ["^MODEL Y", "CYBERTRUCK"]
+      aliases: ["MODEL Y", "CYBERTRUCK"]
+    - make: RIVIAN
+      patterns: ["R1T", "R1S"]
+      aliases: ["R1T", "R1S"]
+    - make: HYUNDAI
+      patterns: ["IONIQ 5", "TUCSON (HYBRID|PLUG)"]
+      aliases: ["IONIQ 5"]
+    - make: KIA
+      patterns: ["^EV6", "^EV9"]
+      aliases: ["EV6", "EV9"]
+    - make: CHEVROLET
+      patterns: ["SILVERADO EV", "BLAZER EV", "EQUINOX EV"]
+      aliases: ["SILVERADO EV", "BLAZER EV", "EQUINOX EV"]
+    - make: TOYOTA
+      patterns: ["RAV4 (HYBRID|PRIME|PLUG)"]
+      aliases: ["RAV4 HYBRID", "RAV4 PRIME"]
+    - make: VOLKSWAGEN
+      patterns: ["^ID\\.?4"]
+      aliases: ["ID.4"]
+
+# Canonical component taxonomy. NHTSA codes complaints with one or more
+# component strings; the first segment before ':' is mapped to these labels.
+# Anything else maps to OTHER.
+components:
+  - AIR BAGS
+  - BACK OVER PREVENTION
+  - ELECTRICAL SYSTEM
+  - ELECTRONIC STABILITY CONTROL
+  - ENGINE
+  - EXTERIOR LIGHTING
+  - FORWARD COLLISION AVOIDANCE
+  - FUEL/PROPULSION SYSTEM
+  - HYBRID PROPULSION SYSTEM
+  - LANE DEPARTURE
+  - LATCHES/LOCKS/LINKAGES
+  - PARKING BRAKE
+  - POWER TRAIN
+  - SEAT BELTS
+  - SEATS
+  - SERVICE BRAKES
+  - STEERING
+  - STRUCTURE
+  - SUSPENSION
+  - TIRES
+  - VEHICLE SPEED CONTROL
+  - VISIBILITY/WIPER
+  - WHEELS
+  - OTHER
+
+severity:
+  levels:
+    S1: "Critical: crash, fire, injury or death occurred, or total loss of braking, steering or motive power while moving"
+    S2: "High: safety-relevant malfunction without an incident (unintended acceleration or braking, intermittent loss of power at speed, ADAS acting on its own, warning of brake or steering failure)"
+    S3: "Medium: functional defect that impairs use but is not an immediate safety risk (charging failure, no-start in park, 12V battery drain, camera or display outage)"
+    S4: "Low: comfort, cosmetic or convenience issue (rattles, trim, infotainment glitches with no safety impact)"
+
+routing:
+  # Records whose calibrated confidence is >= threshold are auto-routed.
+  confidence_threshold: 0.70
+
+retrieval:
+  top_k: 5
+  namespaces: [recalls, recall_docs, tsbs, complaints]
+  hybrid: true          # dense + BM25 fused with reciprocal rank fusion
+  rrf_k: 60
+  # Drop LLM recall matches whose recall component does not overlap the triaged components.
+  require_component_overlap: true
+
+llm:
+  # Provider is chosen by env VSIA_LLM_PROVIDER, falling back to this default.
+  default_provider: ollama
+  temperature: 0.0
+  max_output_tokens: 700
+  providers:
+    # Prices verified 2026-10-18 (docs/research/02_technical_verification.md section 6).
+    anthropic:
+      model: claude-haiku-5-5
+      price_per_mtok: {input: 0.10, output: 0.50}
+    openai:
+      # gpt-5-nano ($0.05/$0.40) is cheaper but its only snapshot shuts down 2026-12-11.
+      model: gpt-6-luna
+      price_per_mtok: {input: 0.10, output: 0.50}
+    ollama:
+      model: qwen2.5:3b
+      base_url: http://localhost:11434
+      price_per_mtok: {input: 0.0, output: 0.0}
+    heuristic:
+      model: tfidf-logreg
+      price_per_mtok: {input: 0.0, output: 0.0}
+
+embeddings:
+  default_provider: ollama
+  providers:
+    ollama: {model: nomic-embed-text, dim: 768}
+    pinecone: {model: llama-text-embed-v2, dim: 1024}
+
+forecast:
+  freq: W-MON
+  holdout_weeks: 12
+  min_weekly_total: 30     # components with fewer total complaints are pooled into OTHER
+  spike_interval: 0.90     # upper bound of the prediction interval used for spike flags

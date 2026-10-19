@@ -1,0 +1,377 @@
+{
+  "name": "VSIA 01 Daily ingest and triage",
+  "nodes": [
+    {
+      "id": "ee855cd7-930e-5c10-9f03-6069cd1333d1",
+      "name": "Daily 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "notes": "Runs at 06:00 in GENERIC_TIMEZONE (PRD FR-1)."
+    },
+    {
+      "id": "2632e21f-e1de-5c22-b9e3-85e80fc1e4f0",
+      "name": "Ingest Daily",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VSIA_API_BASE_URL || 'http://vsia-api:8000' }}/ingest/daily",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 900000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_VSIA_API_CREDENTIAL_ID",
+          "name": "VSIA API bearer"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "notes": "Pulls new NHTSA complaints and recalls. The API also writes a row to ingestion_runs."
+    },
+    {
+      "id": "25f4869e-e500-5bc9-be59-d72607a565ac",
+      "name": "Ingest OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "83b7fc09-d2d5-5e65-908d-018e51f3d94f",
+              "leftValue": "={{ $json.complaints.ok === true && $json.recalls.ok === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "The API reports per-run errors as ok=false with HTTP 200, so check the body as well."
+    },
+    {
+      "id": "7e92826b-5038-598c-900a-6805e810f7b8",
+      "name": "New Complaints?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        720,
+        -200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e49ca987-19f2-583b-9906-8b8a8bffa192",
+              "leftValue": "={{ $json.complaints.rows_inserted }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "34eee5c0-191e-5698-bf34-58dc948e91c9",
+      "name": "Triage Pending",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        -300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VSIA_API_BASE_URL || 'http://vsia-api:8000' }}/triage/pending",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 1800000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ limit: 200 }) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_VSIA_API_CREDENTIAL_ID",
+          "name": "VSIA API bearer"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "notes": "Synchronous; 200 hosted-LLM triages can take many minutes, hence the 30 minute timeout."
+    },
+    {
+      "id": "fd70e42f-bb82-5e17-8056-ce842b762482",
+      "name": "Summarise Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Row counts are kept in the execution data (saveDataSuccessExecution = all) and in the API's\n// ingestion_runs table. This node only shapes them for the notification.\nconst ingest = $('Ingest Daily').first().json;\nlet triage = null;\ntry { triage = $('Triage Pending').first().json; } catch (e) { triage = null; }\nconst c = ingest.complaints || {};\nconst r = ingest.recalls || {};\nconst summary = {\n  status: 'ok',\n  complaints_fetched: c.rows_fetched ?? null,\n  complaints_inserted: c.rows_inserted ?? 0,\n  recalls_inserted: r.rows_inserted ?? 0,\n  triaged: triage ? triage.triaged : 0,\n  routed_auto: triage ? triage.auto : 0,\n  routed_review: triage ? triage.review : 0,\n  triage_run_id: triage ? triage.run_id : null,\n};\nsummary.message = `VSIA daily run: ${summary.complaints_inserted} new complaints, ` +\n  `${summary.recalls_inserted} new recall rows, ${summary.triaged} triaged ` +\n  `(${summary.routed_auto} auto, ${summary.routed_review} to review).`;\nconsole.log(JSON.stringify(summary));\nreturn [{ json: summary }];\n"
+      }
+    },
+    {
+      "id": "987f2140-c870-5c73-9ea1-9e889369ae3b",
+      "name": "Notify Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1440,
+        -200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VSIA_NOTIFY_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.message }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "disabled": true,
+      "notes": "Disabled by default. Set VSIA_NOTIFY_WEBHOOK_URL (Slack/Teams/Discord incoming webhook) and enable."
+    },
+    {
+      "id": "aae72031-5819-5984-b32b-178d529050ca",
+      "name": "Pipeline Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Reached from an HTTP error output ($json.error) or from Ingest OK? = false (ok/error in the body).\nconst err = $json.error || {};\nconst bodyErrors = ['complaints', 'recalls']\n  .filter(k => $json[k] && $json[k].ok === false)\n  .map(k => `${k}: ${$json[k].error || 'unknown error'}`);\nconst detail = err.message || bodyErrors.join('; ') || JSON.stringify($json).slice(0, 500);\nconst message = `VSIA daily run failed: ${detail}`;\nreturn [{ json: { status: 'failed', message } }];\n"
+      }
+    },
+    {
+      "id": "37b5dcf7-733a-5f95-9d22-f15b467cf714",
+      "name": "Notify Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VSIA_NOTIFY_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.message }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "disabled": true,
+      "notes": "Disabled by default. Set VSIA_NOTIFY_WEBHOOK_URL (Slack/Teams/Discord incoming webhook) and enable."
+    },
+    {
+      "id": "f3d5cb3c-d4a0-56d9-89ad-ab921744a121",
+      "name": "Mark Execution Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Re-throw so the execution is recorded as failed (and any error workflow fires) after notifying.\nthrow new Error($json.message || 'VSIA pipeline step failed');\n"
+      }
+    }
+  ],
+  "connections": {
+    "Daily 06:00": {
+      "main": [
+        [
+          {
+            "node": "Ingest Daily",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Daily": {
+      "main": [
+        [
+          {
+            "node": "Ingest OK?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pipeline Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest OK?": {
+      "main": [
+        [
+          {
+            "node": "New Complaints?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pipeline Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Complaints?": {
+      "main": [
+        [
+          {
+            "node": "Triage Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Summarise Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Triage Pending": {
+      "main": [
+        [
+          {
+            "node": "Summarise Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pipeline Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarise Run": {
+      "main": [
+        [
+          {
+            "node": "Notify Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pipeline Failed": {
+      "main": [
+        [
+          {
+            "node": "Notify Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Failure": {
+      "main": [
+        [
+          {
+            "node": "Mark Execution Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -1,0 +1,727 @@
+[
+ {
+  "make": "FORD",
+  "model": "ESCAPE HEV",
+  "model_year": 2021
+ },
+ {
+  "make": "FORD",
+  "model": "ESCAPE PHEV",
+  "model_year": 2021
+ },
+ {
+  "make": "FORD",
+  "model": "F-150 LIGHTNING",
+  "model_year": 2021
+ },
+ {
+  "make": "FORD",
+  "model": "MUSTANG MACH-E",
+  "model_year": 2021
+ },
+ {
+  "make": "FORD",
+  "model": "ESCAPE HEV",
+  "model_year": 2022
+ },
+ {
+  "make": "FORD",
+  "model": "ESCAPE PHEV",
+  "model_year": 2022
+ },
+ {
+  "make": "FORD",
+  "model": "F-150 (Super Crew) Lightning BEV",
+  "model_year": 2022
+ },
+ {
+  "make": "FORD",
+  "model": "F-150 LIGHTNING",
+  "model_year": 2022
+ },
+ {
+  "make": "FORD",
+  "model": "MAVERICK HEV",
+  "model_year": 2022
+ },
+ {
+  "make": "FORD",
+  "model": "MUSTANG MACH-E",
+  "model_year": 2022
+ },
+ {
+  "make": "FORD",
+  "model": "ESCAPE HEV",
+  "model_year": 2023
+ },
+ {
+  "make": "FORD",
+  "model": "ESCAPE PHEV",
+  "model_year": 2023
+ },
+ {
+  "make": "FORD",
+  "model": "F-150 (SUPER CREW) LIGHTNING BEV",
+  "model_year": 2023
+ },
+ {
+  "make": "FORD",
+  "model": "F-150 LIGHTNING",
+  "model_year": 2023
+ },
+ {
+  "make": "FORD",
+  "model": "MAVERICK HEV",
+  "model_year": 2023
+ },
+ {
+  "make": "FORD",
+  "model": "MUSTANG MACH-E",
+  "model_year": 2023
+ },
+ {
+  "make": "FORD",
+  "model": "MUSTANG MACH-E BEV",
+  "model_year": 2023
+ },
+ {
+  "make": "FORD",
+  "model": "ESCAPE HEV",
+  "model_year": 2024
+ },
+ {
+  "make": "FORD",
+  "model": "ESCAPE PHEV",
+  "model_year": 2024
+ },
+ {
+  "make": "FORD",
+  "model": "F-150 (SUPER CREW) LIGHTNING BEV",
+  "model_year": 2024
+ },
+ {
+  "make": "FORD",
+  "model": "F-150 LIGHTNING",
+  "model_year": 2024
+ },
+ {
+  "make": "FORD",
+  "model": "MAVERICK HEV",
+  "model_year": 2024
+ },
+ {
+  "make": "FORD",
+  "model": "MUSTANG MACH-E",
+  "model_year": 2024
+ },
+ {
+  "make": "FORD",
+  "model": "MUSTANG MACH-E BEV",
+  "model_year": 2024
+ },
+ {
+  "make": "FORD",
+  "model": "ESCAPE HEV",
+  "model_year": 2025
+ },
+ {
+  "make": "FORD",
+  "model": "ESCAPE PHEV",
+  "model_year": 2025
+ },
+ {
+  "make": "FORD",
+  "model": "F-150 (SUPER CREW) LIGHTNING BEV",
+  "model_year": 2025
+ },
+ {
+  "make": "FORD",
+  "model": "F-150 LIGHTNING",
+  "model_year": 2025
+ },
+ {
+  "make": "FORD",
+  "model": "MAVERICK HEV EARLY RELEASE",
+  "model_year": 2025
+ },
+ {
+  "make": "FORD",
+  "model": "MAVERICK HEV LATER RELEASE",
+  "model_year": 2025
+ },
+ {
+  "make": "FORD",
+  "model": "MUSTANG MACH-E",
+  "model_year": 2025
+ },
+ {
+  "make": "FORD",
+  "model": "MUSTANG MACH-E BEV",
+  "model_year": 2025
+ },
+ {
+  "make": "FORD",
+  "model": "ESCAPE PHEV PHEV",
+  "model_year": 2026
+ },
+ {
+  "make": "FORD",
+  "model": "F-150 LIGHTNING",
+  "model_year": 2026
+ },
+ {
+  "make": "FORD",
+  "model": "MAVERICK HEV HEV",
+  "model_year": 2026
+ },
+ {
+  "make": "FORD",
+  "model": "MUSTANG MACH-E",
+  "model_year": 2026
+ },
+ {
+  "make": "FORD",
+  "model": "MUSTANG MACH-E BEV BEV",
+  "model_year": 2026
+ },
+ {
+  "make": "TESLA",
+  "model": "CYBERTRUCK",
+  "model_year": 2021
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y",
+  "model_year": 2021
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y  5-SEAT",
+  "model_year": 2021
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y 5-SEAT",
+  "model_year": 2021
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y 7-SEAT",
+  "model_year": 2021
+ },
+ {
+  "make": "TESLA",
+  "model": "CYBERTRUCK",
+  "model_year": 2022
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y",
+  "model_year": 2022
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y  5-SEAT",
+  "model_year": 2022
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y 7-SEAT",
+  "model_year": 2022
+ },
+ {
+  "make": "TESLA",
+  "model": "CYBERTRUCK",
+  "model_year": 2023
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y",
+  "model_year": 2023
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y (ALL VARIANTS) LATER RELEASE",
+  "model_year": 2023
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y (All Variants)",
+  "model_year": 2023
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y RWD EARLY RELEASE",
+  "model_year": 2023
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y RWD LATER RELEASE",
+  "model_year": 2023
+ },
+ {
+  "make": "TESLA",
+  "model": "CYBERTRUCK",
+  "model_year": 2024
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y",
+  "model_year": 2024
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y (All Variants)",
+  "model_year": 2024
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y RWD",
+  "model_year": 2024
+ },
+ {
+  "make": "TESLA",
+  "model": "CYBERTRUCK",
+  "model_year": 2025
+ },
+ {
+  "make": "TESLA",
+  "model": "CYBERTRUCK (ALL VARIANTS)",
+  "model_year": 2025
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y",
+  "model_year": 2025
+ },
+ {
+  "make": "TESLA",
+  "model": "CYBERTRUCK",
+  "model_year": 2026
+ },
+ {
+  "make": "TESLA",
+  "model": "CYBERTRUCK BEV",
+  "model_year": 2026
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y",
+  "model_year": 2026
+ },
+ {
+  "make": "TESLA",
+  "model": "MODEL Y BEV",
+  "model_year": 2026
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1S",
+  "model_year": 2021
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1T",
+  "model_year": 2021
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1S",
+  "model_year": 2022
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1T",
+  "model_year": 2022
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1S",
+  "model_year": 2023
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1T",
+  "model_year": 2023
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1S",
+  "model_year": 2024
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1T",
+  "model_year": 2024
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1S",
+  "model_year": 2025
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1T",
+  "model_year": 2025
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1S",
+  "model_year": 2026
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1S BEV",
+  "model_year": 2026
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1T",
+  "model_year": 2026
+ },
+ {
+  "make": "RIVIAN",
+  "model": "R1T BEV",
+  "model_year": 2026
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "IONIQ 5",
+  "model_year": 2021
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "IONIQ 5",
+  "model_year": 2022
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "TUCSON HYBRID",
+  "model_year": 2022
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "TUCSON PLUG-IN HYBRID",
+  "model_year": 2022
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "IONIQ 5",
+  "model_year": 2023
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "TUCSON HYBRID",
+  "model_year": 2023
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "IONIQ 5",
+  "model_year": 2024
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "TUCSON HYBRID",
+  "model_year": 2024
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "IONIQ 5",
+  "model_year": 2025
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "IONIQ 5 N",
+  "model_year": 2025
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "TUCSON HYBRID",
+  "model_year": 2025
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "TUCSON PLUG-IN HYBRID",
+  "model_year": 2025
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "IONIQ 5",
+  "model_year": 2026
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "IONIQ 5 BEV",
+  "model_year": 2026
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "TUCSON HYBRID HEV",
+  "model_year": 2026
+ },
+ {
+  "make": "HYUNDAI",
+  "model": "TUCSON PLUG-IN HYBRID PHEV",
+  "model_year": 2026
+ },
+ {
+  "make": "KIA",
+  "model": "EV6",
+  "model_year": 2021
+ },
+ {
+  "make": "KIA",
+  "model": "EV9",
+  "model_year": 2021
+ },
+ {
+  "make": "KIA",
+  "model": "EV6",
+  "model_year": 2022
+ },
+ {
+  "make": "KIA",
+  "model": "EV9",
+  "model_year": 2022
+ },
+ {
+  "make": "KIA",
+  "model": "EV6",
+  "model_year": 2023
+ },
+ {
+  "make": "KIA",
+  "model": "EV9",
+  "model_year": 2023
+ },
+ {
+  "make": "KIA",
+  "model": "EV6",
+  "model_year": 2024
+ },
+ {
+  "make": "KIA",
+  "model": "EV9",
+  "model_year": 2024
+ },
+ {
+  "make": "KIA",
+  "model": "EV6",
+  "model_year": 2025
+ },
+ {
+  "make": "KIA",
+  "model": "EV9",
+  "model_year": 2025
+ },
+ {
+  "make": "KIA",
+  "model": "EV6",
+  "model_year": 2026
+ },
+ {
+  "make": "KIA",
+  "model": "EV9",
+  "model_year": 2026
+ },
+ {
+  "make": "KIA",
+  "model": "EV9 BEV",
+  "model_year": 2026
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "BLAZER EV",
+  "model_year": 2021
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "EQUINOX EV",
+  "model_year": 2021
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "SILVERADO EV",
+  "model_year": 2021
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "BLAZER EV",
+  "model_year": 2022
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "EQUINOX EV",
+  "model_year": 2022
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "SILVERADO EV",
+  "model_year": 2022
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "BLAZER EV",
+  "model_year": 2023
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "EQUINOX EV",
+  "model_year": 2023
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "SILVERADO EV",
+  "model_year": 2023
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "BLAZER EV",
+  "model_year": 2024
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "EQUINOX EV",
+  "model_year": 2024
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "SILVERADO EV",
+  "model_year": 2024
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "BLAZER EV",
+  "model_year": 2025
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "EQUINOX EV",
+  "model_year": 2025
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "SILVERADO EV",
+  "model_year": 2025
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "BLAZER EV",
+  "model_year": 2026
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "EQUINOX EV",
+  "model_year": 2026
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "EQUINOX EV BEV",
+  "model_year": 2026
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "SILVERADO EV",
+  "model_year": 2026
+ },
+ {
+  "make": "CHEVROLET",
+  "model": "SILVERADO EV BEV",
+  "model_year": 2026
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 HYBRID",
+  "model_year": 2021
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 PRIME",
+  "model_year": 2021
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 HYBRID",
+  "model_year": 2022
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 PRIME",
+  "model_year": 2022
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 HYBRID",
+  "model_year": 2023
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 PRIME",
+  "model_year": 2023
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 HYBRID",
+  "model_year": 2024
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 PRIME",
+  "model_year": 2024
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 HYBRID",
+  "model_year": 2025
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 PRIME",
+  "model_year": 2025
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 HYBRID",
+  "model_year": 2026
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 PLUG-IN HYBRID",
+  "model_year": 2026
+ },
+ {
+  "make": "TOYOTA",
+  "model": "RAV4 PRIME",
+  "model_year": 2026
+ },
+ {
+  "make": "VOLKSWAGEN",
+  "model": "ID.4",
+  "model_year": 2021
+ },
+ {
+  "make": "VOLKSWAGEN",
+  "model": "ID.4",
+  "model_year": 2022
+ },
+ {
+  "make": "VOLKSWAGEN",
+  "model": "ID.4",
+  "model_year": 2023
+ },
+ {
+  "make": "VOLKSWAGEN",
+  "model": "ID.4",
+  "model_year": 2024
+ },
+ {
+  "make": "VOLKSWAGEN",
+  "model": "ID.4",
+  "model_year": 2025
+ },
+ {
+  "make": "VOLKSWAGEN",
+  "model": "ID.4",
+  "model_year": 2026
+ }
+]

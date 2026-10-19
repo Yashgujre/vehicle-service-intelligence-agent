@@ -1,0 +1,25 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+.streamlit/secrets.toml
+
+# Generated data and artifacts (rebuild with the commands in README.md)
+data/*.db
+data/*.db-journal
+data/raw/*.zip
+data/docs/
+data/index/
+data/models/
+data/mlartifacts/
+data/processed/
+mlruns/
+logs/
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate*
+infra/terraform/terraform.tfvars
+.DS_Store

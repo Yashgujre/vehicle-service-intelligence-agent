@@ -1,0 +1,193 @@
+"""LLM gateway (FR-6, FR-11). One function, `complete_json`, hides the provider. Switching between
+Claude, OpenAI and a local Ollama model is a config change (VSIA_LLM_PROVIDER / VSIA_LLM_MODEL).
+
+Every call:
+  1. asks the provider for JSON constrained by the Pydantic model's schema (native structured output),
+  2. validates the reply with Pydantic, and retries once with the validation error if it fails,
+  3. logs provider, model, tokens, cost and latency to llm_calls (never the prompt text).
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+import time
+from dataclasses import dataclass
+from typing import TypeVar
+
+import httpx
+from pydantic import BaseModel, ValidationError
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
+
+from vsia import config
+from vsia.db import log_llm_call
+from vsia.schemas import LLMCall
+
+T = TypeVar("T", bound=BaseModel)
+
+# Keywords some providers reject in structured-output schemas. Pydantic re-checks them after the call.
+_STRIP_KEYS = {"default", "title", "minimum", "maximum", "maxItems", "minItems", "pattern",
+               "exclusiveMinimum", "exclusiveMaximum", "maxLength", "minLength"}
+
+
+class LLMError(RuntimeError):
+    pass
+
+
+@dataclass
+class LLMResult:
+    data: BaseModel
+    call: LLMCall
+    raw_text: str
+    attempts: int = 1
+
+
+def price(provider: str, input_tokens: int, output_tokens: int) -> float:
+    p = config.settings()["llm"]["providers"].get(provider, {}).get("price_per_mtok", {})
+    return round(input_tokens / 1e6 * p.get("input", 0) + output_tokens / 1e6 * p.get("output", 0), 8)
+
+
+def provider_schema(model: type[BaseModel], strict: bool = False) -> dict:
+    """Pydantic JSON schema cleaned for provider structured-output modes. In strict mode (OpenAI) every
+    object lists all its properties as required and forbids extra keys."""
+    schema = copy.deepcopy(model.model_json_schema())
+
+    def walk(node):
+        if isinstance(node, dict):
+            for k in list(node):
+                if k in _STRIP_KEYS:
+                    node.pop(k)
+            if node.get("type") == "object" or "properties" in node:
+                node["additionalProperties"] = False
+                if strict and "properties" in node:
+                    node["required"] = list(node["properties"].keys())
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(schema)
+    return schema
+
+
+def _retryable(exc: BaseException) -> bool:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in (408, 409, 429) or exc.response.status_code >= 500
+    return isinstance(exc, (httpx.TransportError,))
+
+
+_retry = retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, max=15),
+               retry=retry_if_exception(_retryable), reraise=True)
+
+
+@_retry
+def _call_ollama(model: str, system: str, user: str, schema: dict, max_tokens: int, temperature: float):
+    base = config.env().ollama_base_url or config.settings()["llm"]["providers"]["ollama"]["base_url"]
+    r = httpx.post(f"{base}/api/chat", timeout=300.0, json={
+        "model": model, "stream": False, "format": schema,
+        "options": {"temperature": temperature, "num_predict": max_tokens, "num_ctx": 4096},
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+    })
+    r.raise_for_status()
+    d = r.json()
+    return d["message"]["content"], int(d.get("prompt_eval_count", 0)), int(d.get("eval_count", 0))
+
+
+@_retry
+def _call_anthropic(model: str, system: str, user: str, schema: dict, max_tokens: int, temperature: float):
+    key = config.env().anthropic_api_key
+    if not key:
+        raise LLMError("ANTHROPIC_API_KEY is not set")
+    r = httpx.post("https://api.anthropic.com/v1/messages", timeout=120.0,
+                   headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                   json={"model": model, "max_tokens": max_tokens, "temperature": temperature, "system": system,
+                         "messages": [{"role": "user", "content": user}],
+                         "output_config": {"format": {"type": "json_schema", "schema": schema}}})
+    r.raise_for_status()
+    d = r.json()
+    text = "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text")
+    u = d.get("usage", {})
+    return text, int(u.get("input_tokens", 0)), int(u.get("output_tokens", 0))
+
+
+@_retry
+def _call_openai(model: str, system: str, user: str, schema: dict, max_tokens: int, temperature: float):
+    key = config.env().openai_api_key
+    if not key:
+        raise LLMError("OPENAI_API_KEY is not set")
+    r = httpx.post("https://api.openai.com/v1/responses", timeout=120.0,
+                   headers={"Authorization": f"Bearer {key}"},
+                   json={"model": model, "max_output_tokens": max_tokens,
+                         "input": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                         "text": {"format": {"type": "json_schema", "name": "output", "strict": True,
+                                             "schema": schema}}})
+    r.raise_for_status()
+    d = r.json()
+    text = d.get("output_text") or "".join(
+        c.get("text", "") for item in d.get("output", []) for c in item.get("content", []) or []
+        if c.get("type") in ("output_text", "text"))
+    u = d.get("usage", {})
+    return text, int(u.get("input_tokens", 0)), int(u.get("output_tokens", 0))
+
+
+_PROVIDERS = {"ollama": _call_ollama, "anthropic": _call_anthropic, "openai": _call_openai}
+
+
+def complete_json(system: str, user: str, output_model: type[T], *, purpose: str,
+                  provider: str | None = None, model: str | None = None, prompt_version: str | None = None,
+                  ref_id: str | None = None, max_tokens: int | None = None) -> LLMResult:
+    provider = provider or config.llm_provider()
+    model = model or config.llm_model(provider)
+    if provider not in _PROVIDERS:
+        raise LLMError(f"unknown or non-LLM provider: {provider}")
+    cfg = config.settings()["llm"]
+    max_tokens = max_tokens or cfg["max_output_tokens"]
+    schema = provider_schema(output_model, strict=(provider == "openai"))
+    fn = _PROVIDERS[provider]
+
+    total_in = total_out = 0
+    started = time.perf_counter()
+    msg = user
+    last_err: str | None = None
+    for attempt in range(2):
+        try:
+            text, tin, tout = fn(model, system, msg, schema, max_tokens, cfg["temperature"])
+        except Exception as e:  # noqa: BLE001
+            last_err = f"{type(e).__name__}: {e}"
+            break
+        total_in += tin
+        total_out += tout
+        try:
+            data = output_model.model_validate(json.loads(text))
+            call = LLMCall(provider=provider, model=model, purpose=purpose, input_tokens=total_in,
+                           output_tokens=total_out, cost_usd=price(provider, total_in, total_out),
+                           latency_ms=int((time.perf_counter() - started) * 1000), ok=True,
+                           prompt_version=prompt_version, ref_id=ref_id)
+            log_llm_call(call)
+            return LLMResult(data=data, call=call, raw_text=text, attempts=attempt + 1)
+        except (json.JSONDecodeError, ValidationError) as e:
+            # Logged errors must not quote the model's reply (it can echo complaint text): field paths and
+            # error types only. The full message is still fed back to the model for the repair retry.
+            if isinstance(e, ValidationError):
+                brief = "; ".join(f"{'.'.join(map(str, x['loc']))}: {x['type']}" for x in e.errors()[:8])
+            else:
+                brief = f"JSONDecodeError at position {e.pos}"
+            last_err = f"invalid output (attempt {attempt + 1}): {brief}"[:400]
+            msg = (f"{user}\n\nYour previous reply was rejected by the validator:\n{str(e)[:800]}\n"
+                   "Return only JSON that satisfies the schema.")
+    call = LLMCall(provider=provider, model=model, purpose=purpose, input_tokens=total_in,
+                   output_tokens=total_out, cost_usd=price(provider, total_in, total_out),
+                   latency_ms=int((time.perf_counter() - started) * 1000), ok=False, error=last_err,
+                   prompt_version=prompt_version, ref_id=ref_id)
+    log_llm_call(call)
+    raise LLMError(last_err or "LLM call failed")
+
+
+@_retry
+def embed_ollama(texts: list[str], model: str | None = None) -> list[list[float]]:
+    base = config.env().ollama_base_url or config.settings()["llm"]["providers"]["ollama"]["base_url"]
+    model = model or config.settings()["embeddings"]["providers"]["ollama"]["model"]
+    r = httpx.post(f"{base}/api/embed", timeout=300.0, json={"model": model, "input": texts})
+    r.raise_for_status()
+    return r.json()["embeddings"]

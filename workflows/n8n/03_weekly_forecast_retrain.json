@@ -1,0 +1,266 @@
+{
+  "name": "VSIA 03 Weekly forecast retrain",
+  "nodes": [
+    {
+      "id": "a7a47683-14d3-53cc-b6ac-02c1c3ee881d",
+      "name": "Monday 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 1"
+            }
+          ]
+        }
+      },
+      "notes": "Weekly retrain and spike detection (PRD FR-7)."
+    },
+    {
+      "id": "730997a1-1fe0-52e3-a635-66340297fc6d",
+      "name": "Run Forecast",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VSIA_API_BASE_URL || 'http://vsia-api:8000' }}/forecast/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_VSIA_API_CREDENTIAL_ID",
+          "name": "VSIA API bearer"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "notes": "Expects {run_id, alerts: [...]} once the API returns detection results (requested change); today it returns {ok: true}, so the IF below stays false."
+    },
+    {
+      "id": "674c2b77-2fb7-544f-8592-777b8e2dd4e0",
+      "name": "Spike Alerts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7a5ffc07-fa73-502f-8fa7-bc42f645e7fe",
+              "leftValue": "={{ $json.current_alerts || 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "a43f30ba-7b4b-5486-a6a2-5c5d8512592e",
+      "name": "Format Alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const alerts = ($json.alerts || []).filter(a => a.current);\nconst lines = alerts.slice(0, 10).map(a =>\n  `- ${a.component}, week ${a.week}: ${a.actual} complaints vs upper bound ${Number(a.upper).toFixed(1)} ` +\n  `(ratio ${Number(a.ratio).toFixed(2)})`);\nconst message = `VSIA weekly forecast: ${alerts.length} spike alert(s).\\n` + lines.join('\\n');\nreturn [{ json: { count: alerts.length, run_id: $json.run_id || null, message } }];\n"
+      }
+    },
+    {
+      "id": "f6d3407c-0d06-56e2-98c2-98db7f95366d",
+      "name": "Notify Spike Alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        -200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VSIA_NOTIFY_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.message }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "disabled": true,
+      "notes": "Disabled by default. Set VSIA_NOTIFY_WEBHOOK_URL (Slack/Teams/Discord incoming webhook) and enable."
+    },
+    {
+      "id": "7bbb55b1-d987-5de8-9867-704bd126e2fe",
+      "name": "Forecast Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const err = $json.error || {};\nreturn [{ json: { status: 'failed', message: `VSIA weekly forecast failed: ${err.message || 'unknown error'}` } }];\n"
+      }
+    },
+    {
+      "id": "caefb19d-1609-5adf-a320-1c34848cdc7f",
+      "name": "Notify Forecast Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VSIA_NOTIFY_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.message }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "disabled": true,
+      "notes": "Disabled by default. Set VSIA_NOTIFY_WEBHOOK_URL (Slack/Teams/Discord incoming webhook) and enable."
+    },
+    {
+      "id": "b177f01d-8d12-535b-aead-67ea26890e8f",
+      "name": "Mark Execution Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Re-throw so the execution is recorded as failed (and any error workflow fires) after notifying.\nthrow new Error($json.message || 'VSIA pipeline step failed');\n"
+      }
+    }
+  ],
+  "connections": {
+    "Monday 07:00": {
+      "main": [
+        [
+          {
+            "node": "Run Forecast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Forecast": {
+      "main": [
+        [
+          {
+            "node": "Spike Alerts?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Forecast Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Spike Alerts?": {
+      "main": [
+        [
+          {
+            "node": "Format Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alerts": {
+      "main": [
+        [
+          {
+            "node": "Notify Spike Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forecast Failed": {
+      "main": [
+        [
+          {
+            "node": "Notify Forecast Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Forecast Failure": {
+      "main": [
+        [
+          {
+            "node": "Mark Execution Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

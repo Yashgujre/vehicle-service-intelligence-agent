@@ -1,0 +1,22 @@
+# Build context for the root Dockerfile. Keep it small: only src, config, pipelines and data/raw are copied.
+.git
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.env
+**/.env
+.streamlit
+mlruns
+notebooks
+tests
+eval
+docs
+app
+openwebui
+workflows
+infra
+data/*
+!data/raw
+data/raw/*.zip

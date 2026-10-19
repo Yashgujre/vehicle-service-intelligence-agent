@@ -1,0 +1,140 @@
+{
+  "name": "VSIA 04 RAG chat webhook",
+  "nodes": [
+    {
+      "id": "22ed1082-009a-5f40-8a4b-c8c03fd7aefa",
+      "name": "Chat Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vsia-chat",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "92e5421f-e7a3-54da-8b93-6832b29c7dcd",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_WEBHOOK_CREDENTIAL_ID",
+          "name": "n8n webhook bearer"
+        }
+      },
+      "notes": "Called by the Open WebUI pipe with {question, messages, user_id}. Header auth: Authorization: Bearer <N8N_BEARER>."
+    },
+    {
+      "id": "dbb0492e-56ca-59a9-95cb-fab63070515d",
+      "name": "Ask VSIA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VSIA_API_BASE_URL || 'http://vsia-api:8000' }}/chat",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ question: $json.body.question, provider: $json.body.provider }) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_VSIA_API_CREDENTIAL_ID",
+          "name": "VSIA API bearer"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "notes": "Only the latest question is sent; the API's RAG router is single-turn."
+    },
+    {
+      "id": "c6f2b8f8-64eb-5041-a41d-eba65dc00410",
+      "name": "Respond Answer",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        480,
+        -100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ answer: $json.answer, citations: $json.citations || [], refused: $json.refused || false }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "2ce9216f-9b0a-56e5-9e5e-e1420ed6d061",
+      "name": "Respond Unavailable",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        480,
+        100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ answer: \"The vehicle defect assistant is unavailable right now. Please try again in a few minutes.\", citations: [], refused: false, error: true }) }}",
+        "options": {
+          "responseCode": 502
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chat Webhook": {
+      "main": [
+        [
+          {
+            "node": "Ask VSIA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask VSIA": {
+      "main": [
+        [
+          {
+            "node": "Respond Answer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

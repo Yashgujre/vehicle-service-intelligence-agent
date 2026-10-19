@@ -1,0 +1,44 @@
+#cloud-config
+# Rendered by Terraform templatefile() (compute.tf). Template variables: repo_url, repo_ref.
+# Shell variables are written as $${NAME} so Terraform leaves them alone.
+#
+# What this does on first boot (ADR-0085):
+#   1. Installs Docker and the Compose v2 plugin from the Ubuntu 24.04 archive, plus git.
+#   2. Adds a 2 GB swap file as a safety margin under the 12 GB memory budget.
+#   3. Opens 80/443 in the host iptables rules that OCI Ubuntu images ship with (security lists alone may
+#      not be enough; community guidance, not confirmed in Oracle docs).
+#   4. Clones the repository into /opt/vsia (when repo_url is set).
+#   5. Starts the stack only if infra/compose/.env already exists. Secrets are never put in instance
+#      metadata, so on a fresh VM the stack is started by scripts/deploy_vm.sh after it copies .env.
+
+package_update: true
+package_upgrade: false
+packages:
+  - docker.io
+  - docker-compose-v2
+  - git
+  - rsync
+  - iptables-persistent
+
+write_files:
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {"max-size": "10m", "max-file": "3"}
+      }
+
+runcmd:
+  - [bash, -c, "fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab"]
+  - [bash, -c, "sysctl -w vm.swappiness=10 && echo 'vm.swappiness=10' > /etc/sysctl.d/99-vsia.conf"]
+  - [bash, -c, "iptables -I INPUT -p tcp -m state --state NEW -m multiport --dports 80,443 -j ACCEPT && netfilter-persistent save"]
+  - [systemctl, enable, --now, docker]
+  - [usermod, -aG, docker, ubuntu]
+  - [bash, -c, "mkdir -p /opt/vsia && chown ubuntu:ubuntu /opt/vsia"]
+%{ if repo_url != "" ~}
+  - [sudo, -u, ubuntu, bash, -c, "git clone --branch '${repo_ref}' '${repo_url}' /opt/vsia || (cd /opt/vsia && git fetch --all && git checkout '${repo_ref}' && git pull --ff-only)"]
+%{ endif ~}
+  - [bash, -c, "cd /opt/vsia/infra/compose 2>/dev/null && if [ -f .env ]; then docker compose up -d --build; else echo 'vsia: no infra/compose/.env yet; run scripts/deploy_vm.sh from your laptop' > /opt/vsia/CLOUD_INIT_WAITING_FOR_ENV; fi"]
+
+final_message: "vsia cloud-init finished after $${UPTIME} seconds"

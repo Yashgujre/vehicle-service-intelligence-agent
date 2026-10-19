@@ -1,0 +1,19 @@
+# Streamlit reads only this file, at the repository root (also on Community Cloud).
+
+[theme]
+base = "light"
+primaryColor = "#1F4E79"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F5F8"
+textColor = "#1A1D23"
+font = "sans serif"
+
+[client]
+toolbarMode = "viewer"
+showErrorDetails = "type"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+runOnSave = false

@@ -1,0 +1,125 @@
+{
+ "provider": "heuristic",
+ "model": "tfidf-logreg",
+ "split": "gold",
+ "prompt_version": "triage-v1",
+ "metrics": {
+  "n": 200,
+  "component_accuracy_primary": 0.555,
+  "component_accuracy_any_label": 0.68,
+  "component_macro_f1_primary": 0.5781642139717021,
+  "field_accuracy_make": 1.0,
+  "field_accuracy_model": 1.0,
+  "field_accuracy_model_year": 1.0,
+  "severity_exact_vs_silver": 0.645,
+  "severity_within_one_vs_silver": 0.985,
+  "s1_precision_llm_raw": null,
+  "s1_recall_llm_raw": 0.0,
+  "auto_route_rate": 0.19,
+  "auto_route_accuracy_any_label": 0.8947368421052632,
+  "threshold": 0.825,
+  "recall_at_5_retrieval_silver": 0.8133333333333334,
+  "recall_match_hit_rate_llm_silver": 0.0,
+  "n_with_known_recall": 75,
+  "llm_recall_match_precision_silver": null,
+  "llm_failure_rate": 0.0,
+  "latency_median_s": 0.0805,
+  "latency_p95_s": 0.18109999999999996,
+  "cost_per_1000_usd": 0.0
+ },
+ "per_class_any_label_accuracy": {
+  "FORWARD COLLISION AVOIDANCE": {
+   "n": 20,
+   "acc": 0.65
+  },
+  "OTHER": {
+   "n": 20,
+   "acc": 0.35
+  },
+  "ELECTRICAL SYSTEM": {
+   "n": 20,
+   "acc": 0.65
+  },
+  "POWER TRAIN": {
+   "n": 20,
+   "acc": 0.8
+  },
+  "VEHICLE SPEED CONTROL": {
+   "n": 17,
+   "acc": 0.8235294117647058
+  },
+  "SERVICE BRAKES": {
+   "n": 16,
+   "acc": 0.875
+  },
+  "STEERING": {
+   "n": 16,
+   "acc": 0.875
+  },
+  "VISIBILITY/WIPER": {
+   "n": 11,
+   "acc": 0.7272727272727273
+  },
+  "SUSPENSION": {
+   "n": 7,
+   "acc": 0.2857142857142857
+  },
+  "STRUCTURE": {
+   "n": 7,
+   "acc": 0.7142857142857143
+  },
+  "AIR BAGS": {
+   "n": 6,
+   "acc": 0.8333333333333334
+  },
+  "ENGINE": {
+   "n": 5,
+   "acc": 0.8
+  },
+  "EXTERIOR LIGHTING": {
+   "n": 5,
+   "acc": 0.8
+  },
+  "LANE DEPARTURE": {
+   "n": 4,
+   "acc": 0.0
+  },
+  "FUEL/PROPULSION SYSTEM": {
+   "n": 4,
+   "acc": 0.5
+  },
+  "PARKING BRAKE": {
+   "n": 3,
+   "acc": 0.6666666666666666
+  },
+  "SEAT BELTS": {
+   "n": 3,
+   "acc": 1.0
+  },
+  "SEATS": {
+   "n": 3,
+   "acc": 0.6666666666666666
+  },
+  "TIRES": {
+   "n": 3,
+   "acc": 0.6666666666666666
+  },
+  "WHEELS": {
+   "n": 3,
+   "acc": 0.6666666666666666
+  },
+  "LATCHES/LOCKS/LINKAGES": {
+   "n": 3,
+   "acc": 0.3333333333333333
+  },
+  "BACK OVER PREVENTION": {
+   "n": 3,
+   "acc": 1.0
+  },
+  "HYBRID PROPULSION SYSTEM": {
+   "n": 1,
+   "acc": 0.0
+  }
+ },
+ "mlflow_run_id": "64c8b60f92804a97ba6d197516ab6628"
+}

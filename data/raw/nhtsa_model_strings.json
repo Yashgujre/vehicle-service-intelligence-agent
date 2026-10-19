@@ -1,0 +1,418 @@
+[
+  {
+    "make": "FORD",
+    "model": "F-150 (Super Crew) Lightning BEV",
+    "modelYear": 2022,
+    "complaint_count": 307,
+    "recall_model_string": "F-150 LIGHTNING BEV",
+    "recall_count": 9
+  },
+  {
+    "make": "FORD",
+    "model": "MUSTANG MACH-E",
+    "modelYear": 2022,
+    "complaint_count": 139,
+    "recall_model_string": "MUSTANG MACH E",
+    "recall_count": 9
+  },
+  {
+    "make": "FORD",
+    "model": "F-150 (SUPER CREW) LIGHTNING BEV",
+    "modelYear": 2023,
+    "complaint_count": 206,
+    "recall_model_string": "F-150 LIGHTNING BEV",
+    "recall_count": 9
+  },
+  {
+    "make": "FORD",
+    "model": "MUSTANG MACH-E BEV",
+    "modelYear": 2023,
+    "complaint_count": 126,
+    "recall_model_string": "MUSTANG MACH E",
+    "recall_count": 6
+  },
+  {
+    "make": "FORD",
+    "model": "F-150 (SUPER CREW) LIGHTNING BEV",
+    "modelYear": 2024,
+    "complaint_count": 30,
+    "recall_model_string": "F-150 LIGHTNING BEV",
+    "recall_count": 4
+  },
+  {
+    "make": "FORD",
+    "model": "MUSTANG MACH-E BEV",
+    "modelYear": 2024,
+    "complaint_count": 47,
+    "recall_model_string": "MUSTANG MACH E",
+    "recall_count": 5
+  },
+  {
+    "make": "FORD",
+    "model": "F-150 (SUPER CREW) LIGHTNING BEV",
+    "modelYear": 2025,
+    "complaint_count": 8,
+    "recall_model_string": "F-150 LIGHTNING BEV",
+    "recall_count": 3
+  },
+  {
+    "make": "FORD",
+    "model": "MUSTANG MACH-E BEV",
+    "modelYear": 2025,
+    "complaint_count": 14,
+    "recall_model_string": "MUSTANG MACH E",
+    "recall_count": 7
+  },
+  {
+    "make": "RIVIAN",
+    "model": "R1S",
+    "modelYear": 2022,
+    "complaint_count": 4,
+    "recall_model_string": "R1S",
+    "recall_count": 13
+  },
+  {
+    "make": "RIVIAN",
+    "model": "R1T",
+    "modelYear": 2022,
+    "complaint_count": 70,
+    "recall_model_string": "R1T",
+    "recall_count": 12
+  },
+  {
+    "make": "RIVIAN",
+    "model": "R1S",
+    "modelYear": 2023,
+    "complaint_count": 76,
+    "recall_model_string": "R1S",
+    "recall_count": 10
+  },
+  {
+    "make": "RIVIAN",
+    "model": "R1T",
+    "modelYear": 2023,
+    "complaint_count": 40,
+    "recall_model_string": "R1T",
+    "recall_count": 8
+  },
+  {
+    "make": "RIVIAN",
+    "model": "R1S",
+    "modelYear": 2024,
+    "complaint_count": 17,
+    "recall_model_string": "R1S",
+    "recall_count": 7
+  },
+  {
+    "make": "RIVIAN",
+    "model": "R1T",
+    "modelYear": 2024,
+    "complaint_count": 10,
+    "recall_model_string": "R1T",
+    "recall_count": 7
+  },
+  {
+    "make": "RIVIAN",
+    "model": "R1S",
+    "modelYear": 2025,
+    "complaint_count": 55,
+    "recall_model_string": "R1S",
+    "recall_count": 11
+  },
+  {
+    "make": "RIVIAN",
+    "model": "R1T",
+    "modelYear": 2025,
+    "complaint_count": 10,
+    "recall_model_string": "R1T",
+    "recall_count": 8
+  },
+  {
+    "make": "TESLA",
+    "model": "MODEL Y  5-SEAT",
+    "modelYear": 2022,
+    "complaint_count": 870,
+    "recall_model_string": "MODEL Y",
+    "recall_count": 20
+  },
+  {
+    "make": "TESLA",
+    "model": "MODEL Y 7-SEAT",
+    "modelYear": 2022,
+    "complaint_count": 870,
+    "recall_model_string": "MODEL Y",
+    "recall_count": 20
+  },
+  {
+    "make": "TESLA",
+    "model": "MODEL Y (ALL VARIANTS) LATER RELEASE",
+    "modelYear": 2023,
+    "complaint_count": 78,
+    "recall_model_string": "MODEL Y",
+    "recall_count": 17
+  },
+  {
+    "make": "TESLA",
+    "model": "MODEL Y (All Variants)",
+    "modelYear": 2023,
+    "complaint_count": 1181,
+    "recall_model_string": "MODEL Y",
+    "recall_count": 17
+  },
+  {
+    "make": "TESLA",
+    "model": "MODEL Y RWD EARLY RELEASE",
+    "modelYear": 2023,
+    "complaint_count": 78,
+    "recall_model_string": "MODEL Y",
+    "recall_count": 17
+  },
+  {
+    "make": "TESLA",
+    "model": "MODEL Y RWD LATER RELEASE",
+    "modelYear": 2023,
+    "complaint_count": 78,
+    "recall_model_string": "MODEL Y",
+    "recall_count": 17
+  },
+  {
+    "make": "TESLA",
+    "model": "MODEL Y (All Variants)",
+    "modelYear": 2024,
+    "complaint_count": 328,
+    "recall_model_string": "MODEL Y",
+    "recall_count": 5
+  },
+  {
+    "make": "TESLA",
+    "model": "MODEL Y RWD",
+    "modelYear": 2024,
+    "complaint_count": 34,
+    "recall_model_string": "MODEL Y",
+    "recall_count": 5
+  },
+  {
+    "make": "TESLA",
+    "model": "MODEL Y",
+    "modelYear": 2025,
+    "complaint_count": 106,
+    "recall_model_string": "MODEL Y",
+    "recall_count": 3
+  },
+  {
+    "make": "HYUNDAI",
+    "model": "IONIQ 5",
+    "modelYear": 2022,
+    "complaint_count": 407,
+    "recall_model_string": "IONIQ 5",
+    "recall_count": 3
+  },
+  {
+    "make": "HYUNDAI",
+    "model": "IONIQ 5",
+    "modelYear": 2023,
+    "complaint_count": 388,
+    "recall_model_string": "IONIQ 5",
+    "recall_count": 4
+  },
+  {
+    "make": "HYUNDAI",
+    "model": "IONIQ 5",
+    "modelYear": 2024,
+    "complaint_count": 224,
+    "recall_model_string": "IONIQ 5",
+    "recall_count": 3
+  },
+  {
+    "make": "HYUNDAI",
+    "model": "IONIQ 5",
+    "modelYear": 2025,
+    "complaint_count": 297,
+    "recall_model_string": "IONIQ 5",
+    "recall_count": 9
+  },
+  {
+    "make": "HYUNDAI",
+    "model": "IONIQ 5 N",
+    "modelYear": 2025,
+    "complaint_count": 18,
+    "recall_model_string": "IONIQ 5 N",
+    "recall_count": 0
+  },
+  {
+    "make": "KIA",
+    "model": "EV6",
+    "modelYear": 2022,
+    "complaint_count": 278,
+    "recall_model_string": "EV6",
+    "recall_count": 4
+  },
+  {
+    "make": "KIA",
+    "model": "EV6",
+    "modelYear": 2023,
+    "complaint_count": 137,
+    "recall_model_string": "EV6",
+    "recall_count": 4
+  },
+  {
+    "make": "KIA",
+    "model": "EV6",
+    "modelYear": 2024,
+    "complaint_count": 77,
+    "recall_model_string": "EV6",
+    "recall_count": 3
+  },
+  {
+    "make": "KIA",
+    "model": "EV6",
+    "modelYear": 2025,
+    "complaint_count": 55,
+    "recall_model_string": "EV6",
+    "recall_count": 0
+  },
+  {
+    "make": "CHEVROLET",
+    "model": "BLAZER EV",
+    "modelYear": 2024,
+    "complaint_count": 78,
+    "recall_model_string": "BLAZER EV",
+    "recall_count": 5
+  },
+  {
+    "make": "CHEVROLET",
+    "model": "EQUINOX EV",
+    "modelYear": 2024,
+    "complaint_count": 108,
+    "recall_model_string": "EQUINOX EV",
+    "recall_count": 1
+  },
+  {
+    "make": "CHEVROLET",
+    "model": "SILVERADO EV",
+    "modelYear": 2024,
+    "complaint_count": 25,
+    "recall_model_string": "SILVERADO EV",
+    "recall_count": 4
+  },
+  {
+    "make": "CHEVROLET",
+    "model": "BLAZER EV",
+    "modelYear": 2025,
+    "complaint_count": 21,
+    "recall_model_string": "BLAZER EV",
+    "recall_count": 3
+  },
+  {
+    "make": "CHEVROLET",
+    "model": "EQUINOX EV",
+    "modelYear": 2025,
+    "complaint_count": 163,
+    "recall_model_string": "EQUINOX EV",
+    "recall_count": 6
+  },
+  {
+    "make": "CHEVROLET",
+    "model": "SILVERADO EV",
+    "modelYear": 2025,
+    "complaint_count": 14,
+    "recall_model_string": "SILVERADO EV",
+    "recall_count": 1
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4",
+    "modelYear": 2022,
+    "complaint_count": 149,
+    "recall_model_string": "RAV4",
+    "recall_count": 1
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4 HYBRID",
+    "modelYear": 2022,
+    "complaint_count": 5,
+    "recall_model_string": "RAV4 HYBRID",
+    "recall_count": 2
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4 PRIME",
+    "modelYear": 2022,
+    "complaint_count": 22,
+    "recall_model_string": "RAV4 PRIME",
+    "recall_count": 3
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4",
+    "modelYear": 2023,
+    "complaint_count": 159,
+    "recall_model_string": "RAV4",
+    "recall_count": 3
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4 HYBRID",
+    "modelYear": 2023,
+    "complaint_count": 8,
+    "recall_model_string": "RAV4 HYBRID",
+    "recall_count": 1
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4 PRIME",
+    "modelYear": 2023,
+    "complaint_count": 65,
+    "recall_model_string": "RAV4 PRIME",
+    "recall_count": 2
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4",
+    "modelYear": 2024,
+    "complaint_count": 176,
+    "recall_model_string": "RAV4",
+    "recall_count": 3
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4 HYBRID",
+    "modelYear": 2024,
+    "complaint_count": 1,
+    "recall_model_string": "RAV4 HYBRID",
+    "recall_count": 2
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4 PRIME",
+    "modelYear": 2024,
+    "complaint_count": 29,
+    "recall_model_string": "RAV4 PRIME",
+    "recall_count": 2
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4",
+    "modelYear": 2025,
+    "complaint_count": 90,
+    "recall_model_string": "RAV4",
+    "recall_count": 3
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4 HYBRID",
+    "modelYear": 2025,
+    "complaint_count": 5,
+    "recall_model_string": "RAV4 HYBRID",
+    "recall_count": 2
+  },
+  {
+    "make": "TOYOTA",
+    "model": "RAV4 PHEV",
+    "modelYear": 2025,
+    "complaint_count": 10,
+    "recall_model_string": "RAV4 PLUG-IN HYBRID",
+    "recall_count": 2
+  }
+]

@@ -1,0 +1,310 @@
+{
+  "name": "VSIA 02 Review queue digest and decisions",
+  "nodes": [
+    {
+      "id": "9faebbe7-332e-526e-bfb2-57ccac016a30",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 * * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e1c9df6a-6f95-5da4-a4ea-f511682d84a6",
+      "name": "Get Pending Reviews",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.VSIA_API_BASE_URL || 'http://vsia-api:8000' }}/review/pending",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_VSIA_API_CREDENTIAL_ID",
+          "name": "VSIA API bearer"
+        }
+      },
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "notes": "The API returns a JSON array; n8n emits one item per pending review."
+    },
+    {
+      "id": "4ff83baa-95a4-5959-a90c-2deac517abc1",
+      "name": "Count Backlog",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// alwaysOutputData yields one empty item when the queue is empty, so count only real rows.\nconst rows = $input.all().map(i => i.json).filter(j => j && j.queue_id !== undefined);\nconst threshold = Number($env.VSIA_REVIEW_BACKLOG_THRESHOLD || 25);\nconst lowest = rows.length ? Math.min(...rows.map(r => Number(r.confidence))) : null;\nconst oldest = rows.length ? rows.map(r => r.created_at).sort()[0] : null;\nconst message = `VSIA review backlog: ${rows.length} pending (threshold ${threshold}); ` +\n  `oldest ${oldest || 'n/a'}, lowest confidence ${lowest === null ? 'n/a' : lowest.toFixed(2)}.`;\nreturn [{ json: { count: rows.length, threshold, oldest_created_at: oldest, lowest_confidence: lowest, message } }];\n"
+      }
+    },
+    {
+      "id": "eabddca2-57ea-5899-9dd5-d0e5cbc68edb",
+      "name": "Backlog Above Threshold?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1771582f-6414-5de7-a7aa-deb40b998f90",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": "={{ $json.threshold }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "9725f5a2-6ff8-58ef-b6c5-31a233527fcc",
+      "name": "Notify Reviewers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VSIA_NOTIFY_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.message }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "disabled": true,
+      "notes": "Disabled by default. Set VSIA_NOTIFY_WEBHOOK_URL (Slack/Teams/Discord incoming webhook) and enable."
+    },
+    {
+      "id": "367f6a12-f7e0-5595-b0f4-aafa99989c7c",
+      "name": "Review Decision Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vsia-review",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "aa531467-980a-501c-b4cb-e40bacb97981",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_WEBHOOK_CREDENTIAL_ID",
+          "name": "n8n webhook bearer"
+        }
+      },
+      "notes": "POST /webhook/vsia-review with a ReviewDecision body, e.g. {\"odi_number\": 11770375, \"accepted\": false, \"component\": \"SERVICE BRAKES\", \"severity\": \"S2\", \"reviewer\": \"analyst\"}."
+    },
+    {
+      "id": "9e526c07-6730-59b0-97d9-1f747d571396",
+      "name": "Submit Decision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VSIA_API_BASE_URL || 'http://vsia-api:8000' }}/review/decision",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_VSIA_API_CREDENTIAL_ID",
+          "name": "VSIA API bearer"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "3e6e2ef4-1b05-590a-8ad6-7856449a4fcc",
+      "name": "Respond Decision",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, result: $json }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "6ef2059b-dc2d-5123-b315-5c31e8738dd4",
+      "name": "Respond Decision Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        480,
+        500
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: ($json.error && $json.error.message) || 'decision rejected' }) }}",
+        "options": {
+          "responseCode": 422
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Reviews",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Reviews": {
+      "main": [
+        [
+          {
+            "node": "Count Backlog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Backlog": {
+      "main": [
+        [
+          {
+            "node": "Backlog Above Threshold?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backlog Above Threshold?": {
+      "main": [
+        [
+          {
+            "node": "Notify Reviewers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Decision Webhook": {
+      "main": [
+        [
+          {
+            "node": "Submit Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Decision": {
+      "main": [
+        [
+          {
+            "node": "Respond Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Decision Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

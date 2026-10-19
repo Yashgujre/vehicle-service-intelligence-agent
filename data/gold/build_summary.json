@@ -1,0 +1,86 @@
+{
+ "built_at": "2026-10-19T05:45:25+00:00",
+ "sizes": {
+  "gold": 200,
+  "calibration": 300,
+  "train": 9803
+ },
+ "gold_components": {
+  "FORWARD COLLISION AVOIDANCE": 20,
+  "OTHER": 20,
+  "ELECTRICAL SYSTEM": 20,
+  "POWER TRAIN": 20,
+  "VEHICLE SPEED CONTROL": 17,
+  "SERVICE BRAKES": 16,
+  "STEERING": 16,
+  "VISIBILITY/WIPER": 11,
+  "SUSPENSION": 7,
+  "STRUCTURE": 7,
+  "AIR BAGS": 6,
+  "ENGINE": 5,
+  "EXTERIOR LIGHTING": 5,
+  "LANE DEPARTURE": 4,
+  "FUEL/PROPULSION SYSTEM": 4,
+  "PARKING BRAKE": 3,
+  "SEAT BELTS": 3,
+  "SEATS": 3,
+  "TIRES": 3,
+  "WHEELS": 3,
+  "LATCHES/LOCKS/LINKAGES": 3,
+  "BACK OVER PREVENTION": 3,
+  "HYBRID PROPULSION SYSTEM": 1
+ },
+ "gold_s1_flags": 25,
+ "gold_with_known_recall": 75,
+ "gold_with_candidate_recall": 159,
+ "gold_multilabel": 76,
+ "gold_severity": {
+  "S3:rule_default": 76,
+  "S2:rule_keywords": 54,
+  "S3:rule_keywords": 28,
+  "S1:nhtsa_flags": 25,
+  "S4:rule_keywords": 14,
+  "S1:rule_keywords": 3
+ },
+ "calibration_components": {
+  "ELECTRICAL SYSTEM": 89,
+  "FORWARD COLLISION AVOIDANCE": 35,
+  "POWER TRAIN": 31,
+  "OTHER": 23,
+  "VEHICLE SPEED CONTROL": 19,
+  "STEERING": 18,
+  "SERVICE BRAKES": 18,
+  "VISIBILITY/WIPER": 12,
+  "STRUCTURE": 8,
+  "SUSPENSION": 8,
+  "AIR BAGS": 6,
+  "ENGINE": 6,
+  "EXTERIOR LIGHTING": 6,
+  "LANE DEPARTURE": 5,
+  "FUEL/PROPULSION SYSTEM": 4,
+  "SEAT BELTS": 3,
+  "BACK OVER PREVENTION": 3,
+  "TIRES": 2,
+  "WHEELS": 2,
+  "SEATS": 2
+ },
+ "calibration_severity": {
+  "S3:rule_default": 110,
+  "S2:rule_keywords": 89,
+  "S3:rule_keywords": 55,
+  "S1:nhtsa_flags": 30,
+  "S4:rule_keywords": 12,
+  "S1:rule_keywords": 4
+ },
+ "population_with_known_recall": 4718,
+ "population_s1_flags": 930,
+ "labels_rows_written": 500,
+ "review_csv": "data/gold/gold_set_review.csv",
+ "swaps": {
+  "s1": 0,
+  "with_recall": 0
+ },
+ "classes_excluded_from_gold": [
+  "ELECTRONIC STABILITY CONTROL"
+ ]
+}

@@ -1,0 +1,13 @@
+# Minimal, pinned dependencies for the dashboard on Streamlit Community Cloud.
+# Community Cloud reads app/requirements.txt (the entrypoint directory wins over the repo root, where
+# pyproject.toml would otherwise be picked up). Keep app/requirements.txt identical to this file;
+# tests/test_app_data.py checks that.
+streamlit==1.66.0
+plotly==7.1.0
+pandas==3.0.6
+pyarrow==25.0.1
+numpy==2.4.6
+sqlalchemy==2.1.5
+pydantic==2.14.1
+pydantic-settings==2.16.0
+pyyaml==6.0.3

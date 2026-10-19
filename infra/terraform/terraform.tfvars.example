@@ -1,0 +1,31 @@
+# Copy to terraform.tfvars (gitignored) and fill in. OCIDs are identifiers, not secrets, but keep the file
+# out of Git anyway. The Pinecone key is read from the PINECONE_API_KEY environment variable.
+
+tenancy_ocid     = "ocid1.tenancy.oc1..aaaaaaaaexample"
+user_ocid        = "ocid1.user.oc1..aaaaaaaaexample"
+fingerprint      = "12:34:56:78:90:ab:cd:ef:12:34:56:78:90:ab:cd:ef"
+private_key_path = "~/.oci/oci_api_key.pem"
+region           = "us-ashburn-1"
+compartment_ocid = "ocid1.tenancy.oc1..aaaaaaaaexample"
+
+# Your public IP for SSH, for example from: curl -s https://checkip.amazonaws.com
+admin_cidr = "198.51.100.7/32"
+
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+
+# Public repository cloned by cloud-init. Leave empty to rsync the working tree with scripts/deploy_vm.sh.
+repo_url = ""
+repo_ref = "main"
+
+# Leave empty to use chat.<ip>.sslip.io style host names.
+domain = ""
+
+# Change to 1 or 2 and re-apply when OCI reports "Out of host capacity".
+availability_domain_index = 0
+
+instance_ocpus      = 2
+instance_memory_gbs = 12
+boot_volume_gbs     = 100
+
+manage_pinecone_index = true
+pinecone_index_name   = "vsia"

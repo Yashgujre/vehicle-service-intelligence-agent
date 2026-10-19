@@ -1,0 +1,221 @@
+# Vehicle Service Intelligence Agent: production-style stack for one OCI Always Free A1 VM
+# (VM.Standard.A1.Flex, 2 OCPU / 12 GB). See docs/architecture/deployment.md and ADR-0080.
+#
+#   cd infra/compose && cp .env.example .env && <edit .env> && docker compose up -d --build
+#
+# Memory limits sum to 8.25 GB, leaving about 3.75 GB for the OS, Docker and page cache.
+# Only caddy publishes public ports (80, 443). MLflow binds to 127.0.0.1 for SSH tunnels.
+# Image tags are pinned to the versions verified in docs/research/02_technical_verification.md,
+# except postgres and caddy, which that file does not cover (official tags, not separately verified).
+
+name: vsia
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    <<: [*restart, *logging]
+    mem_limit: 1g
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: postgres
+      # Read by postgres-init.sql through \getenv on first start only.
+      VSIA_DB_PASSWORD: ${VSIA_DB_PASSWORD:?set VSIA_DB_PASSWORD in .env}
+      N8N_DB_PASSWORD: ${N8N_DB_PASSWORD:?set N8N_DB_PASSWORD in .env}
+      MLFLOW_DB_PASSWORD: ${MLFLOW_DB_PASSWORD:?set MLFLOW_DB_PASSWORD in .env}
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=60"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [backend]
+
+  n8n:
+    image: n8nio/n8n:2.43.7
+    <<: [*restart, *logging]
+    mem_limit: 1536m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD: ${N8N_DB_PASSWORD}
+      DB_POSTGRESDB_SCHEMA: public
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?set N8N_ENCRYPTION_KEY in .env (32+ random chars, never change it)}
+      N8N_HOST: ${N8N_FQDN:-localhost}
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-https}
+      # N8N_WEBHOOK_URL replaces WEBHOOK_URL, which is deprecated since n8n 2.35.0.
+      N8N_WEBHOOK_URL: ${N8N_PROTOCOL:-https}://${N8N_FQDN:-localhost}/
+      GENERIC_TIMEZONE: ${TZ:-America/Chicago}
+      TZ: ${TZ:-America/Chicago}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      # Workflows read the API base URL with $env; set explicitly because the 2.x image default is unverified.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      VSIA_API_BASE_URL: http://vsia-api:8000
+      VSIA_REVIEW_BACKLOG_THRESHOLD: ${VSIA_REVIEW_BACKLOG_THRESHOLD:-25}
+      VSIA_NOTIFY_WEBHOOK_URL: ${VSIA_NOTIFY_WEBHOOK_URL:-}
+      VSIA_CONFIDENCE_THRESHOLD: ${VSIA_CONFIDENCE_THRESHOLD:-0.70}
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "336"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5678/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks: [backend, frontend]
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.17.1
+    <<: [*restart, *logging]
+    mem_limit: 1g
+    # SQLite backend on a volume (ADR-0081): verified default, supports the Model Registry, and avoids
+    # the unverified psycopg2 dependency of the slim image. The vsia-api container mounts the same volume
+    # at the same path because the forecast pipeline writes artifacts to a file:// artifact location.
+    command:
+      - mlflow
+      - server
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --artifacts-destination
+      - /mlflow/artifacts
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --workers
+      - "1"
+    volumes:
+      - mlflow-data:/mlflow
+    ports:
+      - "127.0.0.1:5000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks: [backend, frontend]
+
+  vsia-api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: vsia-api:local
+    <<: [*restart, *logging]
+    mem_limit: 2g
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+psycopg://vsia:${VSIA_DB_PASSWORD}@postgres:5432/vsia
+      VSIA_API_TOKEN: ${VSIA_API_TOKEN:?set VSIA_API_TOKEN in .env}
+      VSIA_LLM_PROVIDER: ${VSIA_LLM_PROVIDER:-anthropic}
+      VSIA_LLM_MODEL: ${VSIA_LLM_MODEL:-}
+      VSIA_VECTOR_STORE: ${VSIA_VECTOR_STORE:-pinecone}
+      # VSIA_CONFIDENCE_THRESHOLD is deliberately not passed: an empty value fails pydantic float parsing,
+      # and unset lets the API use the per-provider tuned threshold in data/models/routing_<provider>.json.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PINECONE_API_KEY: ${PINECONE_API_KEY:-}
+      PINECONE_INDEX: ${PINECONE_INDEX:-vsia}
+      LLAMA_CLOUD_API_KEY: ${LLAMA_CLOUD_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+    volumes:
+      - vsia-data:/app/data
+      - mlflow-data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks: [backend, frontend]
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.12.3
+    <<: [*restart, *logging]
+    mem_limit: 2560m
+    depends_on:
+      n8n:
+        condition: service_healthy
+    environment:
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:?set WEBUI_SECRET_KEY in .env}
+      WEBUI_URL: https://${CHAT_FQDN:-localhost}
+    volumes:
+      - open-webui-data:/app/backend/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks: [backend, frontend]
+
+  caddy:
+    image: caddy:2-alpine
+    <<: [*restart, *logging]
+    mem_limit: 256m
+    depends_on:
+      - open-webui
+      - n8n
+      - vsia-api
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env (Let's Encrypt account contact)}
+      CHAT_FQDN: ${CHAT_FQDN:-localhost}
+      N8N_FQDN: ${N8N_FQDN:-n8n.localhost}
+      API_FQDN: ${API_FQDN:-api.localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [frontend]
+
+networks:
+  # No egress and no published ports: Postgres lives only here.
+  backend:
+    internal: true
+  # Egress to NHTSA, LLM and Pinecone APIs, and the only network caddy can reach.
+  frontend: {}
+
+volumes:
+  pgdata:
+  n8n-data:
+  mlflow-data:
+  vsia-data:
+  open-webui-data:
+  caddy-data:
+  caddy-config:

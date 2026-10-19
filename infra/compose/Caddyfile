@@ -1,0 +1,27 @@
+# TLS reverse proxy (ADR-0082). Caddy obtains Let's Encrypt certificates automatically for each host name.
+# Host names come from the environment (infra/compose/.env). With no DNS name, use sslip.io, for example
+# CHAT_FQDN=chat.203-0-113-10.sslip.io, which resolves to 203.0.113.10.
+# Only these three services are public. Postgres and MLflow are never routed here.
+
+{
+	email {$ACME_EMAIL}
+}
+
+# Chat front end (Open WebUI has its own login; the first account created becomes admin).
+{$CHAT_FQDN} {
+	encode zstd gzip
+	reverse_proxy open-webui:8080
+}
+
+# n8n editor and production webhooks (n8n owner account required for the editor; webhooks use header auth).
+{$N8N_FQDN} {
+	encode zstd gzip
+	reverse_proxy n8n:5678
+}
+
+# VSIA API for the Streamlit dashboard and external callers. Every endpoint except /health requires
+# the VSIA_API_TOKEN bearer token, enforced by the API itself.
+{$API_FQDN} {
+	encode zstd gzip
+	reverse_proxy vsia-api:8000
+}
