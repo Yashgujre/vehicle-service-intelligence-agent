@@ -256,3 +256,11 @@ def test_rag_redacts_the_question_before_any_model_call(clean_env):
     assert len(prompts) == 2
     for p in prompts:
         assert "555-201-7788" not in p and "jane.doe@example.com" not in p and "battery" in p
+
+
+def test_year_filter_matches_recall_documents_that_span_years():
+    doc = {"campaign_number": "24V001000", "model_years": [2022, 2023, 2024]}
+    assert retrieval.matches_filter(doc, {"model_years": 2023})
+    assert retrieval.matches_filter(doc, {"model_years": "2023"})
+    assert not retrieval.matches_filter(doc, {"model_years": 2021})
+    assert not retrieval.matches_filter(doc, {"model_year": 2023})

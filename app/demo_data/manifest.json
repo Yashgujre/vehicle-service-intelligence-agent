@@ -1,31 +1,36 @@
 {
- "exported_at": "2026-10-19 06:12 UTC",
+ "exported_at": "2026-10-19 23:13 UTC",
  "source_backend": "sqlite",
  "rows": {
   "complaints": 10303,
-  "review_queue": 0,
-  "triage_records": 0,
-  "complaint_texts": 0,
+  "review_queue": 3,
+  "triage_records": 503,
+  "complaint_texts": 501,
   "recalls": 407,
   "ingestion_runs": 3,
-  "forecasts": 0,
-  "spike_alerts": 0,
-  "eval_runs": 0,
+  "forecasts": 320,
+  "spike_alerts": 18,
+  "eval_runs": 2,
   "llm_cost_summary": 2
  },
- "routing_files": [],
+ "routing_files": [
+  "routing_heuristic.json",
+  "routing_ollama.json"
+ ],
  "bytes": {
-  "complaint_texts.parquet": 1520,
+  "complaint_texts.parquet": 135269,
   "complaints.parquet": 69406,
-  "eval_runs.parquet": 3108,
-  "forecasts.parquet": 4833,
+  "eval_runs.parquet": 13390,
+  "forecasts.parquet": 10438,
   "ingestion_runs.parquet": 6018,
-  "llm_cost_summary.parquet": 7868,
+  "llm_cost_summary.parquet": 7876,
   "recalls.parquet": 43827,
-  "review_queue.parquet": 3676,
-  "spike_alerts.parquet": 3919,
-  "triage_records.parquet": 8390
+  "review_queue.parquet": 4831,
+  "routing_heuristic.json": 3161,
+  "routing_ollama.json": 3316,
+  "spike_alerts.parquet": 5754,
+  "triage_records.parquet": 107367
  },
- "total_bytes": 152565,
+ "total_bytes": 410653,
  "redaction": "complaint narratives and free-text model output passed through vsia.guardrails.redact"
 }

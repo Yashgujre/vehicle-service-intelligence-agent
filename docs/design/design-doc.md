@@ -432,7 +432,7 @@ Docker on the development laptop).
 | 4. Forecast champion | Successful training run, champion registered, holdout WAPE compared with seasonal naive | Done: `glm_poisson` registered as v1 `@champion`; holdout WAPE 50.33 against 65.95 for the seasonal naive ([backtest report](../models/backtest-report.md)) |
 | 5. VM deployment | Terraform apply, Compose up, health checks green, workflows imported and activated one at a time | Defined, not exercised |
 | 6. Shadow operation | Daily workflow 01 active with notifications; review queue worked daily; SLIs collected for 28 days | Not started |
-| 7. Public demo | Hosted demo deployed on Streamlit Community Cloud from a redacted data bundle and passing the runbook smoke test (ADR-0089, [runbook](../operations/runbooks/hosted-demo.md)); snapshot kept as the fallback | Hosted demo code, bundle build and runbook in place; first bundle built (62,837,362 bytes, ADR-0091). Snapshot exported from the laptop with empty triage and forecast tables |
+| 7. Public demo | Hosted demo deployed on Streamlit Community Cloud from a redacted data bundle and passing the runbook smoke test (ADR-0089, [runbook](../operations/runbooks/hosted-demo.md)); snapshot kept as the fallback | Hosted demo code, bundle build and runbook in place; bundle published as release `demo-data-v1` (62,847,379 bytes, ADR-0091). Fallback snapshot re-exported 2026-10-19 23:13 UTC with 503 triage records, 320 forecasts and 18 spike alerts |
 
 Rollback: deactivate the n8n workflow (the API remains for manual use); switch `VSIA_LLM_PROVIDER` to
 `ollama` or `heuristic` during a provider outage. No database backup job is defined in `infra/` yet (see
@@ -458,8 +458,11 @@ open question 9).
    candidate abort registration? The cause is answered: MLflow's default skops format refused the custom
    wrapper, and ADR-0055 switched to cloudpickle; the 2026-10-19 rerun registered a champion. Whether one
    failing candidate should abort registration remains open.
-7. **Recall document year filter.** Chat and `/search` filter `recall_docs` by `model_year`, but those
-   records store `model_years`; the year filter currently excludes every document chunk.
+7. **Recall document year filter.** Chat and `/search` filtered `recall_docs` by `model_year`, but those
+   records store `model_years`, so the year filter excluded every document chunk. Closed 2026-10-19: both
+   call sites map the filter to `model_years` (`src/vsia/rag.py` `answer`, `src/vsia/api.py` `search`), and
+   `matches_filter` matches one year against the list; test
+   `test_year_filter_matches_recall_documents_that_span_years`.
 8. **PRD location.** ADRs cite the PRD by FR number, but the PRD is not in the repository.
 9. **Backups.** The Compose stack has health checks but no Postgres or MLflow backup; what recovery point
    is acceptable for `labels` (human decisions cannot be regenerated)?

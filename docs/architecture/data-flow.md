@@ -175,13 +175,13 @@ this database yet.
 | `recalls` | 407 (200 campaigns) | J2 (insert only, skip existing campaign x vehicle) | J3, J5, J6, J8 (`recall_lookup`), J12 (dates for the weak recall check), J13, dashboard | Public manufacturer recall text, no consumer PII; not redacted |
 | `recall_documents` | 150 | J4 (delete then insert per `source_url`) | J4 (skip already parsed), J5 | `markdown` redacted before storage (R1) |
 | `ingestion_runs` | 3 | J1, J2 | Dashboard, J13, operators | Counts and error strings only |
-| `triage_records` | 0 | J8 (all callers, including J9 with `eval-` run ids), J14 (direct Postgres insert) | J8 (`/triage/pending` skips already triaged), J9 (scores the jsonl, not this table), J10, J13, dashboard | `output` holds model-extracted fields from redacted input; see the note on the heuristic path below |
-| `review_queue` | 0 | J8 (when route is review and `enqueue` is true), J10 (status update) | J10, n8n workflow 02, J13, dashboard | `reason` holds rule names; redacted again on export (R6) |
+| `triage_records` | 1,082 (1,079 with `eval-` run ids, 3 from the dashboard playground) | J8 (all callers, including J9 with `eval-` run ids), J14 (direct Postgres insert) | J8 (`/triage/pending` skips already triaged), J9 (scores the jsonl, not this table), J10, J13, dashboard | `output` holds model-extracted fields from redacted input; see the note on the heuristic path below |
+| `review_queue` | 3 | J8 (when route is review and `enqueue` is true), J10 (status update) | J10, n8n workflow 02, J13, dashboard | `reason` holds rule names; redacted again on export (R6) |
 | `labels` | 500 (all `gold_silver`) | J6 (`gold_silver`, `gold_hand` with `--promote`), J10 (`review`) | Calibrator refit on reviewed labels (planned, ADR-0061) | No narrative text; `note` is reviewer free text |
-| `llm_calls` | 3 | `vsia.llm` gateway on every call (J4 fallback, J8, J9, J11, smoke test) | Dashboard cost view, J13 (aggregates only), [cost model](../operations/cost-model.md) | Metadata only, no prompt or reply text; `error` holds validation field paths and error types only (gap closed 2026-10-19, fixed in `src/vsia/llm.py`) |
+| `llm_calls` | 583 | `vsia.llm` gateway on every call (J4 fallback, J8, J9, J11, smoke test) | Dashboard cost view, J13 (aggregates only), [cost model](../operations/cost-model.md) | Metadata only, no prompt or reply text; `error` holds validation field paths and error types only (gap closed 2026-10-19, fixed in `src/vsia/llm.py`) |
 | `forecasts` | 320 | J12 detect (delete then insert for the weeks it scores) | Dashboard trends, J13 | Numbers only |
 | `spike_alerts` | 18 | J12 detect | API response to n8n workflow 03, dashboard, J13 | Numbers only |
-| `eval_runs` | 0 | J9 score | Dashboard evaluation page, J13 | Metrics JSON only |
+| `eval_runs` | 2 (heuristic and Ollama, gold split) | J9 score | Dashboard evaluation page, J13 | Metrics JSON only |
 
 ### Files and external stores
 
