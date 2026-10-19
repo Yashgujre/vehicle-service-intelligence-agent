@@ -55,7 +55,8 @@ only when stated), and the security sentence.
 </question>
 ```
 
-The question is **not redacted** before this call (risk R-03; `src/vsia/rag.py` line 54).
+The question is redacted with `guardrails.redact()` before this call (`src/vsia/rag.py` line 76, in
+`answer`). Risk R-03 (question not redacted) was closed 2026-10-19, fixed in `src/vsia/rag.py`.
 
 ### 3.3 Output: `QueryPlan`
 
@@ -100,7 +101,7 @@ Complaint counts in the dataset (component, make, complaints):      (aggregate i
 | Complaint hits | `retrieval.search_complaints` with make and model-year filters | Narratives were redacted at index time; query redacted |
 | Recall hits | `store.search` on `recalls` and `recall_docs` | Document chunks were redacted before storage; recall API text is public and not redacted |
 | Aggregate counts | `vsia.rag._stats`: SQL `COUNT` grouped by `component_primary` and make | Counts are computed in SQL, so the model does not do arithmetic |
-| Question | Request body | `wrap_untrusted(tag="question")`; **not redacted** (`src/vsia/rag.py` line 109) |
+| Question | Request body | `redact()` (`src/vsia/rag.py` line 76), then `wrap_untrusted(tag="question")` (line 112) |
 
 The `<context>` block is assembled by string concatenation and is not neutralised by `wrap_untrusted`
 (risk R-09). If retrieval fails, the context contains `(retrieval unavailable: <exception type>)`.

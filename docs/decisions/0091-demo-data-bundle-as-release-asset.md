@@ -22,11 +22,16 @@ would take many minutes and depend on NHTSA uptime.
 - the recalls, recall_docs and complaints index namespaces;
 - the classifier and every `routing_*.json` and calibrator.
 
-The first build on 2026-10-19 was 62,837,362 bytes, with 75 complaint narratives changed by redaction.
+The published bundle (release `demo-data-v1`, 2026-10-19) is 62,847,379 bytes, sha256
+`a402ef85e9f22ad90ec71059e32605055913f3942eb4aea263d9ac2078d45ee4`, with 75 complaint narratives changed by
+redaction.
 
 The bundle is published as a GitHub release asset. The app downloads it on first start when
 `VSIA_BUNDLE_URL` is set, verifies `VSIA_BUNDLE_SHA256`, and unpacks only regular files under `data/`
-(`vsia.bundle.ensure`).
+(`vsia.bundle.ensure`). The checksum is mandatory: the bundle contains joblib files, and loading a joblib
+file runs code, so an unverified bundle is never installed. If the secret is missing, the download fails or
+the checksum does not match, nothing is unpacked, the app shows a warning with the cause and the pages fall
+back to the read-only snapshot (ADR-0072). The install is attempted once per server process.
 
 ## Options considered
 

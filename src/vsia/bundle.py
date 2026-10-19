@@ -100,10 +100,13 @@ def installed(root: Path = config.REPO_ROOT) -> bool:
     return (root / "data" / DB_NAME).exists() and (root / MARKER).exists()
 
 
-def ensure(url: str, sha256: str | None = None, root: Path = config.REPO_ROOT) -> dict:
-    """Download and unpack the bundle unless it is already installed. Verifies sha256 when given."""
+def ensure(url: str, sha256: str | None, root: Path = config.REPO_ROOT) -> dict:
+    """Download and unpack the bundle unless it is already installed. The sha256 is mandatory: the bundle
+    carries joblib files, and loading a joblib file runs code."""
     if installed(root):
         return json.loads((root / MARKER).read_text())
+    if not sha256:
+        raise ValueError("VSIA_BUNDLE_SHA256 must be set together with VSIA_BUNDLE_URL")
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "bundle.tar.gz"
         with httpx.stream("GET", url, follow_redirects=True, timeout=300.0) as r:
@@ -112,7 +115,7 @@ def ensure(url: str, sha256: str | None = None, root: Path = config.REPO_ROOT) -
                 for chunk in r.iter_bytes(1 << 20):
                     f.write(chunk)
         digest = sha256_file(path)
-        if sha256 and digest != sha256.lower():
+        if digest != sha256.strip().lower():
             raise ValueError(f"bundle checksum mismatch: expected {sha256}, got {digest}")
         with tarfile.open(path, "r:gz") as tar:
             tar.extractall(root, members=_safe_members(tar))

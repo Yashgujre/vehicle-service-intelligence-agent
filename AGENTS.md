@@ -55,7 +55,9 @@ healthcare referrals. Keep domain specifics in `config/settings.yaml`, loaders a
   campaigns (407 vehicle rows).
 - LLM: `vsia.llm.complete_json(system, user, PydanticModel, purpose=..., prompt_version=..., ref_id=...)`
   returns `LLMResult(data, call, raw_text)` and logs to `llm_calls`. Providers: `ollama` (default,
-  `qwen2.5:3b`), `anthropic` (`claude-haiku-5-5`), `openai` (`gpt-6-luna`).
+  `qwen2.5:3b`), `anthropic` (`claude-haiku-5-5`), `openai` (`gpt-6-luna`), `gemini`
+  (`gemini-2.5-flash-lite`, free tier) and `groq` (`openai/gpt-oss-20b`, free tier); Gemini and Groq use
+  their OpenAI-compatible Chat Completions endpoints (ADR-0088).
 - Embeddings: `vsia.llm.embed_ollama(texts)` returns 768-dimension vectors (`nomic-embed-text`).
 - Python: `.venv` (Python 3.11). Run `source .venv/bin/activate`. Install with `uv pip install ...`.
 - Network calls need the shell to run outside the sandbox.

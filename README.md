@@ -117,7 +117,7 @@ Hosting the free public demo: [hosted-demo runbook](docs/operations/runbooks/hos
 
 | Part | Status |
 |---|---|
-| Ingestion, PDF parsing, index, triage agent, RAG chat, forecasting, dashboard, API, guardrails | Built and run end to end on the laptop; 167 automated tests pass |
+| Ingestion, PDF parsing, index, triage agent, RAG chat, forecasting, dashboard, API, guardrails | Built and run end to end on the laptop; 172 automated tests pass |
 | Hosted demo path (bundle download, in-process embeddings, offline mode) | Rehearsed locally from a clean copy with no Ollama |
 | Gemini and Groq calls | Covered by tests with mocked HTTP; live calls not yet run |
 | n8n workflows, Open WebUI, Docker Compose, Terraform for the OCI VM | Written and statically validated; not yet executed (ADR-0008) |

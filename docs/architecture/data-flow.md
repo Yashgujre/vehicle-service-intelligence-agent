@@ -19,7 +19,7 @@ security view of the same flows, with trust boundaries, is in
 
 ## Flowchart
 
-Redaction points are marked `R1` to `R7`; they are listed in the table after the diagram.
+Redaction points are marked `R1` to `R9`; they are listed in the table after the diagram.
 
 ```mermaid
 flowchart LR
@@ -56,6 +56,7 @@ flowchart LR
 
   subgraph pub["Published outputs"]
     demo["app/demo_data/*.parquet"]
+    bundle["GitHub release asset<br/>vsia-demo-bundle.tar.gz"]
     reports["docs/evaluation/ reports,<br/>docs/models/forecast-plots/"]
   end
 
@@ -109,7 +110,7 @@ flowchart LR
   tri --> J10
   J10 --> rq
   J10 --> lab
-  comp --> J11["J11 RAG chat (R5)"]
+  comp --> J11["J11 RAG chat (R5, R9)"]
   idx --> J11
   J11 --> llm
   J11 --> llmc
@@ -129,6 +130,13 @@ flowchart LR
   rec --> J13
   llmc --> J13
   J13 --> demo
+  comp --> J15["J15 demo bundle build (R8)"]
+  idx --> J15
+  mdl --> J15
+  J15 --> bundle
+  bundle --> J16["J16 hosted demo on Streamlit Community Cloud"]
+  demo -.->|"fallback only"| J16
+  J16 --> llm
 ```
 
 `R7` (log redaction in `vsia.observability`) applies to every job that logs and is not drawn.
@@ -151,6 +159,8 @@ flowchart LR
 | J12 | Forecast train and detect | `pipelines/forecast.py train, detect` via `POST /forecast/run` | n8n workflow 03 Monday 07:00, or manual |
 | J13 | Demo snapshot export | `scripts/export_demo_snapshot.py` | Manual, before publishing the dashboard |
 | J14 | Native n8n triage variant | `workflows/n8n/05_triage_agent_native.json` | Manual demo only (ADR-0075) |
+| J15 | Demo data bundle build | `scripts/build_demo_bundle.py` (`vsia.bundle.build`): a copy of the database with every complaint narrative redacted, the three index namespaces, the classifier, calibrators and routing files | Manual, before publishing the bundle as a GitHub release asset (ADR-0091) |
+| J16 | Hosted demo | `app/streamlit_app.py` on Streamlit Community Cloud. On first start `app/hosted.py` `bootstrap` downloads and unpacks the bundle (`vsia.bundle.ensure`) when `VSIA_BUNDLE_URL` is set, then runs J8 and J11 in-process on it (ADR-0089) | Visitor |
 
 ## Datasets: writers, readers and redaction
 
@@ -168,9 +178,9 @@ this database yet.
 | `triage_records` | 0 | J8 (all callers, including J9 with `eval-` run ids), J14 (direct Postgres insert) | J8 (`/triage/pending` skips already triaged), J9 (scores the jsonl, not this table), J10, J13, dashboard | `output` holds model-extracted fields from redacted input; see the note on the heuristic path below |
 | `review_queue` | 0 | J8 (when route is review and `enqueue` is true), J10 (status update) | J10, n8n workflow 02, J13, dashboard | `reason` holds rule names; redacted again on export (R6) |
 | `labels` | 500 (all `gold_silver`) | J6 (`gold_silver`, `gold_hand` with `--promote`), J10 (`review`) | Calibrator refit on reviewed labels (planned, ADR-0061) | No narrative text; `note` is reviewer free text |
-| `llm_calls` | 3 | `vsia.llm` gateway on every call (J4 fallback, J8, J9, J11, smoke test) | Dashboard cost view, J13 (aggregates only), [cost model](../operations/cost-model.md) | Metadata only, no prompt or reply text; `error` can contain a validator message (see open issue) |
-| `forecasts` | 0 | J12 detect (delete then insert for the weeks it scores) | Dashboard trends, J13 | Numbers only |
-| `spike_alerts` | 0 | J12 detect | API response to n8n workflow 03, dashboard, J13 | Numbers only |
+| `llm_calls` | 3 | `vsia.llm` gateway on every call (J4 fallback, J8, J9, J11, smoke test) | Dashboard cost view, J13 (aggregates only), [cost model](../operations/cost-model.md) | Metadata only, no prompt or reply text; `error` holds validation field paths and error types only (gap closed 2026-10-19, fixed in `src/vsia/llm.py`) |
+| `forecasts` | 320 | J12 detect (delete then insert for the weeks it scores) | Dashboard trends, J13 | Numbers only |
+| `spike_alerts` | 18 | J12 detect | API response to n8n workflow 03, dashboard, J13 | Numbers only |
 | `eval_runs` | 0 | J9 score | Dashboard evaluation page, J13 | Metrics JSON only |
 
 ### Files and external stores
@@ -190,7 +200,8 @@ this database yet.
 | `data/mlflow.db`, `data/mlartifacts/` | J9 score, J12 train | J12 detect (champion), MLflow UI | Metrics, parameters, plots, model files |
 | `docs/evaluation/reports/`, `model-comparison.md`, `baseline-classifier.md` | J9, J7 | Readers, dashboard | Aggregate metrics |
 | `docs/models/forecast-plots/*.png` | J12 train | Readers | Plots |
-| `app/demo_data/*.parquet`, `manifest.json` | J13 (redacts narratives and free text, R6) | Public Streamlit dashboard (ADR-0072) | Redacted narratives only for snapshot triage and review rows |
+| `app/demo_data/*.parquet`, `manifest.json` | J13 (redacts narratives and free text, R6) | Dashboard in snapshot mode; the hosted demo (J16) falls back to it only when `VSIA_BUNDLE_URL` is unset or the bundle cannot be installed (ADR-0072, ADR-0089) | Redacted narratives only for snapshot triage and review rows |
+| `vsia-demo-bundle.tar.gz` (GitHub release asset) | J15 (redacts every complaint narrative in the database copy, R8) | J16 (unpacked into `data/` in the hosted container) | Redacted narratives; index text as in `data/index/`; model files (ADR-0091) |
 
 ## Redaction points
 
@@ -203,19 +214,23 @@ this database yet.
 | R5 | Triage and search queries | `src/vsia/agent.py` (`guardrails.redact(c.summary)` first step), `src/vsia/retrieval.py` (query redaction in `search_recalls_for_complaint`, `search_complaints`, `search_sources`), `src/vsia/api.py` `GET /search` | Everything the triage LLM, classifier and embedding query see |
 | R6 | Dashboard and demo snapshot | `app/data.py` (`complaint_text`, `redact_obj`), `scripts/export_demo_snapshot.py` | Narratives and free-text model output before display or publication |
 | R7 | Structured logs | `src/vsia/observability.py` (string fields redacted before emission) | Log lines |
+| R8 | Demo data bundle build | `src/vsia/bundle.py` `_redacted_db_copy` | Every complaint narrative in the database copy, before it is packed and published; the hosted demo's database never holds a raw narrative |
+| R9 | RAG chat question | `src/vsia/rag.py` `answer` (line 76) | The user's question before the plan call, retrieval and the answer call |
 
 ### Gaps in redaction coverage (not fixed in code)
 
-- **RAG chat question.** `vsia.rag` redacts the retrieval query (through `retrieval.search_complaints`) but
-  sends the user's question to the LLM wrapped with `wrap_untrusted` only, not redacted
-  (`src/vsia/rag.py` lines 53 and 109). The question is typed by an internal user, not a consumer, but the
-  rule in AGENTS.md covers any LLM input.
 - **Heuristic provider symptom.** With provider `heuristic`, `src/vsia/agent.py` line 87 copies the first
   160 characters of the unredacted `c.summary` into `output.extracted.symptom`, which is stored in
   `triage_records.output`. The dashboard and the snapshot redact it again on read (R6), but the stored row
   is not redacted.
-- **LLM call errors.** `src/vsia/llm.py` line 170 stores the Pydantic validation message in
-  `llm_calls.error`; such messages can quote fragments of the model's reply.
 - **Raw narratives at rest.** `complaints.summary` is stored unredacted by design (public source data,
   needed for re-redaction when the redactor improves). Access control for the database is the control; see
   the [threat model](../security/threat-model.md).
+
+### Closed gaps
+
+- **RAG chat question** (gap G1): the question reached the LLM wrapped but not redacted. Closed
+  2026-10-19, fixed in `src/vsia/rag.py` (R9).
+- **LLM call errors** (gap G6): `llm_calls.error` could quote fragments of the model's reply in Pydantic
+  validation messages. Closed 2026-10-19, fixed in `src/vsia/llm.py`: only field paths and error types are
+  stored.

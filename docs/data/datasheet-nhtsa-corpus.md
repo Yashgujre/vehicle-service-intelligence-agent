@@ -229,8 +229,9 @@ an earlier recall load that has no run record.
 **Who was involved?** No crowdworkers or annotators. Data collection is automated.
 
 **Ethical review.** No formal ethical review was carried out; the data is public. The project's own controls are PII
-redaction, no publication of raw narratives (the public dashboard shows a redacted snapshot, ADR-0072)
-and no attempt to re-identify complainants.
+redaction, no publication of raw narratives (the public hosted demo runs on a data bundle whose complaint
+narratives are redacted at build, ADR-0091, with a redacted snapshot as the fallback, ADR-0072) and no
+attempt to re-identify complainants.
 
 **Were the individuals notified or did they consent?** NHTSA publishes complaints as public records; VSIA
 does not contact complainants and adds no data about them.
@@ -274,8 +275,12 @@ trend rather than defect signal.
 - The corpus is not redistributed. `data/*.db`, `data/docs/`, `data/index/` and `data/models/` are
   git-ignored; anyone can rebuild the corpus from the public APIs with `vsia ingest`,
   `scripts/fetch_recall_docs.py`, `python -m vsia.documents` and `scripts/build_index.py`.
-- The public dashboard ships a redacted parquet snapshot in `app/demo_data/` (152,565 bytes, exported
-  2026-10-19 06:12 UTC; ADR-0072).
+- The public hosted demo on Streamlit Community Cloud downloads a demo data bundle from a GitHub release
+  asset: a copy of the database with every complaint narrative redacted at build
+  (`vsia.bundle._redacted_db_copy`), the local index and the small models (ADR-0089, ADR-0091).
+- The repository also ships a redacted parquet snapshot in `app/demo_data/` (152,565 bytes, exported
+  2026-10-19 06:12 UTC; ADR-0072), which the hosted demo shows only as a fallback when `VSIA_BUNDLE_URL`
+  is unset or the bundle cannot be installed.
 - Source terms: the data is published by NHTSA on nhtsa.gov and its public APIs. Check NHTSA's current
   terms before republishing narratives.
 

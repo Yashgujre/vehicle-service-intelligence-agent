@@ -85,5 +85,5 @@ The download URL is
 | "shared free key has reached today's limit" | Daily cap (ADR-0092) or Gemini daily quota | Expected under load; resets at midnight Pacific. Add `GROQ_API_KEY` as backup |
 | Triage shows "free-tier rate limit was hit" | 15 requests per minute exceeded | Transient; wait a minute |
 | "This app has gone over its resource limits" | Memory ceiling | Reboot from Manage app; see ADR-0089 revisit trigger |
-| "bundle checksum mismatch" at start | Secret and release asset disagree | Re-copy the sha256 from the build output |
+| Warning "demo dataset could not be installed" and snapshot pages only | Bundle download failed, `VSIA_BUNDLE_SHA256` missing, or "bundle checksum mismatch" (secret and release asset disagree); the cause is in the warning | Fix the secret or re-copy the sha256 from the build output, then reboot (the install is tried once per process) |
 | Ask page slow on first question | Embedding model download after a cold start (ADR-0090) | Expected once per start |

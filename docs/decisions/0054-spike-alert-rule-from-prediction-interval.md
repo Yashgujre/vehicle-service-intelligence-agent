@@ -50,10 +50,27 @@ under-cover overdispersed series; the GBM quantile interval covered 0.854 on the
 
 - Alert volume can be tuned with two settings (`spike_interval`, `MIN_ALERT_COUNT`) without retraining
   the point model, except that GBM interval models are refitted for a new interval level.
-- Alert precision against recalls is measured by `detect` (pending, no `detect` run yet).
+- Alert precision against recalls is measured by `detect` (pending, no `detect` run yet). See the update
+  below for the first result.
 
 ## Revisit when
 
 Analysts label at least 30 alerts as useful or not (tune the interval and minimum count on those labels),
 the recall-proximity rate of alerts is not above the base rate after 12 weekly runs, or alert volume
 exceeds what one analyst reviews in a week.
+
+## Update (2026-10-19)
+
+The completed training run `train-20261019T182422Z` registered `glm_poisson` as
+`vsia-complaint-forecaster` v1 `@champion` (run `98acce0d6c244ef9a75db49e2e9a1ea5`), and `detect` ran
+with it on the 12 weeks after the training cut (2026-07-20 to 2026-10-05, 240 component-weeks). It stored
+18 spike alerts, the same 18 flags as the backtest holdout above; SES gives 14 on the same weeks. The
+interval covered 218 of 240 component-weeks (0.908), with 19 above the upper bound and 3 below.
+
+The recall-proximity check is no longer pending. Under the pipeline definition (`near_recall()` in
+`pipelines/forecast.py`), 6 of 18 alerts (0.333) had a same-component recall nearby, against a base rate of
+0.304 over all 240 component-weeks. Under a stricter symmetric plus or minus 28-day window, 4 of 18 (0.222)
+did, against a base rate of 0.283. Alerts are therefore not early warnings of recalls on this data; they
+remain "more complaints than expected" signals for an analyst. With 18 alerts the check has little power.
+This is one run, not the 12 weekly runs named in the revisit trigger. Source:
+[backtest report](../models/backtest-report.md), section 4.

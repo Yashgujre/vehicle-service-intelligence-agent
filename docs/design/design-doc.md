@@ -53,7 +53,7 @@ multi-user product, and fine-tuning models.
 | G4 | Triage each complaint into extracted fields, component, severity and recall matches with citations (FR-4) | Component accuracy at least 85% | Measured in docs/evaluation/ (pending) |
 | G5 | Route uncertain triage to a human and turn the decision into a label (FR-5) | At least 70% auto-routed | Measured in docs/evaluation/ (pending) |
 | G6 | Switch LLM provider by configuration (FR-6) | Same code, any provider | Implemented for Ollama, Anthropic, OpenAI, Gemini, Groq and a no-LLM heuristic (ADR-0002, ADR-0088) |
-| G7 | Weekly per-component forecast and spike alerts (FR-7) | Beat seasonal naive | Measured in docs/evaluation/ (pending); no champion model is registered yet |
+| G7 | Weekly per-component forecast and spike alerts (FR-7) | Beat seasonal naive | Met on the backtest holdout: champion `glm_poisson` (`vsia-complaint-forecaster` v1) has 1-step WAPE 50.33 against 65.95 for the seasonal naive, a ratio of 0.763 ([backtest report](../models/backtest-report.md)) |
 | G8 | Dashboard (FR-8) | Pages load in under 5 s | Cold load 1.6 s, warm 0.25 to 0.56 s on the demo snapshot (ADR-0074) |
 | G9 | Chat over the corpus with citations (FR-9) | Grounded answers, refusals out of scope | Implemented (ADR-0065); quality measured in docs/evaluation/ (pending) |
 | G10 | Infrastructure as code (FR-10) | One-command VM | Terraform, cloud-init and Compose defined (ADR-0080 to ADR-0087) |
@@ -239,8 +239,12 @@ nothing; it is the fallback when no LLM is available.
   retraining.
 - Detection writes `forecasts` and `spike_alerts` (actual above the 90% upper bound and at least 3
   complaints) and reports alerts in the last 4 weeks and recalls within 28 days.
-- Current state: the first training run (`train-20261019T054635Z`) failed at the Poisson GLM candidate;
-  there is no champion, and the forecast tables are empty.
+- Current state (2026-10-19): earlier training runs failed while logging a candidate model (skops
+  serialization; fixed by ADR-0055). Run `train-20261019T182422Z` completed and registered `glm_poisson` as
+  `vsia-complaint-forecaster` v1 `@champion` (run `98acce0d6c244ef9a75db49e2e9a1ea5`): holdout 1-step
+  WAPE 50.33 against 65.95 for the seasonal naive (ratio 0.763). `detect` stored 320 forecast rows and 18
+  spike alerts. Alerts are not early warnings of recalls: 6 of 18 were near a same-component recall against
+  a base rate of 0.304 ([backtest report](../models/backtest-report.md), section 4).
 
 ### 4.11 Evaluation (`eval/build_gold.py`, `eval/splits.py`, `eval/run_eval.py`)
 
@@ -425,7 +429,7 @@ Docker on the development laptop).
 | 1. Laptop data foundation | Corpus ingested, documents parsed, index built | Done except the complaints namespace (in progress) |
 | 2. Baselines and labels | Silver gold set and splits; baseline classifier report | Done ([baseline-classifier.md](../evaluation/baseline-classifier.md)) |
 | 3. Offline evaluation | `predict` and `score` on gold for Ollama and one hosted provider; calibrator and threshold fitted per provider; comparison report | Not started (pending) |
-| 4. Forecast champion | Successful training run, champion registered, holdout WAPE compared with seasonal naive | Blocked: first run failed |
+| 4. Forecast champion | Successful training run, champion registered, holdout WAPE compared with seasonal naive | Done: `glm_poisson` registered as v1 `@champion`; holdout WAPE 50.33 against 65.95 for the seasonal naive ([backtest report](../models/backtest-report.md)) |
 | 5. VM deployment | Terraform apply, Compose up, health checks green, workflows imported and activated one at a time | Defined, not exercised |
 | 6. Shadow operation | Daily workflow 01 active with notifications; review queue worked daily; SLIs collected for 28 days | Not started |
 | 7. Public demo | Hosted demo deployed on Streamlit Community Cloud from a redacted data bundle and passing the runbook smoke test (ADR-0089, [runbook](../operations/runbooks/hosted-demo.md)); snapshot kept as the fallback | Hosted demo code, bundle build and runbook in place; first bundle built (62,837,362 bytes, ADR-0091). Snapshot exported from the laptop with empty triage and forecast tables |
@@ -447,9 +451,13 @@ open question 9).
 4. **Evaluation and production overlap.** `POST /triage/pending` skips any complaint with any triage
    record, including evaluation runs, so gold and calibration complaints never get a production triage.
    Should the filter ignore `eval-` run ids?
-5. **Chat redaction.** Should the chat question be redacted before the LLM, as triage input is?
+5. **Chat redaction.** Should the chat question be redacted before the LLM, as triage input is? Closed
+   2026-10-19, fixed in `src/vsia/rag.py`: `answer()` redacts the question before planning, retrieval and
+   the answer call.
 6. **Forecast failure.** Why did the Poisson GLM candidate fail on the first run, and should one failing
-   candidate abort registration?
+   candidate abort registration? The cause is answered: MLflow's default skops format refused the custom
+   wrapper, and ADR-0055 switched to cloudpickle; the 2026-10-19 rerun registered a champion. Whether one
+   failing candidate should abort registration remains open.
 7. **Recall document year filter.** Chat and `/search` filter `recall_docs` by `model_year`, but those
    records store `model_years`; the year filter currently excludes every document chunk.
 8. **PRD location.** ADRs cite the PRD by FR number, but the PRD is not in the repository.

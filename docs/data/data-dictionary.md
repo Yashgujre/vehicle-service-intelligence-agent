@@ -359,4 +359,4 @@ These are not tables, but they are inputs or outputs of the same jobs and appear
 | `data/models/confidence_calibrator_<provider>.joblib`, `routing_<provider>.json` | `eval/run_eval.py calibrate` | Calibrator and tuned threshold per provider (not present at the time of writing) | no |
 | `data/eval/<split>_<provider>.jsonl`, `score_<split>_<provider>.json` | `eval/run_eval.py` | Stored predictions and scores (not present at the time of writing) | possible (model output) |
 | `data/mlflow.db`, `data/mlartifacts/` | `pipelines/forecast.py`, `eval/run_eval.py` | MLflow tracking store and artifacts | no |
-| `app/demo_data/*.parquet`, `manifest.json` | `scripts/export_demo_snapshot.py` | Redacted public dashboard snapshot (ADR-0072) | no (redacted) |
+| `app/demo_data/*.parquet`, `manifest.json` | `scripts/export_demo_snapshot.py` | Redacted read-only dashboard snapshot; the hosted demo's fallback when no data bundle is installed (ADR-0072, ADR-0089) | no (redacted) |

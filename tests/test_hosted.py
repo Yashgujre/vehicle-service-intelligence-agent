@@ -150,6 +150,8 @@ def test_bundle_build_redacts_and_ensure_installs(tmp_path, monkeypatch):
         yield httpx.Response(200, content=payload, request=httpx.Request(method, url))
 
     monkeypatch.setattr(bundle.httpx, "stream", fake_stream)
+    with pytest.raises(ValueError, match="VSIA_BUNDLE_SHA256"):
+        bundle.ensure("https://example.test/b.tar.gz", None, root=dst)
     with pytest.raises(ValueError, match="checksum"):
         bundle.ensure("https://example.test/b.tar.gz", "0" * 64, root=dst)
     info = bundle.ensure("https://example.test/b.tar.gz", m["sha256"], root=dst)
@@ -169,3 +171,88 @@ def test_bundle_rejects_paths_outside_data(tmp_path):
     buf.seek(0)
     with tarfile.open(fileobj=buf, mode="r:gz") as tar, pytest.raises(ValueError, match="unsafe"):
         bundle._safe_members(tar)
+
+
+@pytest.fixture
+def hosted_mod(clean_env):
+    import sys
+    from types import SimpleNamespace
+
+    sys.path.insert(0, str(config.REPO_ROOT / "app"))
+    import hosted
+
+    session: dict = {}
+    clean_env.setattr(hosted, "st", SimpleNamespace(session_state=session, warning=lambda msg: session.update(warned=msg)))
+    return hosted, session
+
+
+def _log_calls(provider: str, n: int) -> None:
+    from datetime import datetime
+
+    from sqlalchemy import insert
+
+    from vsia import db
+
+    with db.engine().begin() as conn:
+        conn.execute(insert(db.llm_calls), [{"provider": provider, "model": "m", "purpose": "triage", "ok": True,
+                                             "created_at": datetime.utcnow()} for _ in range(n)])
+
+
+def test_quota_guard_caps_session_and_day_for_the_shared_key_only(hosted_mod):
+    hosted, session = hosted_mod
+    shared = hosted.ModelChoice(provider="gemini", model="m", source="hosted")
+    own = hosted.ModelChoice(provider="gemini", model="m", source="own", keys={"gemini": "k"})
+    assert hosted.quota_block(shared) is None
+    hosted.count_ai_calls(shared, hosted.SESSION_AI_RUNS - 1)
+    hosted.count_ai_calls(own, 50)
+    assert session["ai_runs"] == hosted.SESSION_AI_RUNS - 1
+    assert hosted.quota_block(shared) is None
+    assert "this session" in hosted.quota_block(shared, calls_needed=2).lower()
+    assert hosted.quota_block(own, calls_needed=99) is None
+
+    session.clear()
+    _log_calls("gemini", config.env().vsia_hosted_daily_llm_calls)
+    assert "today's limit" in hosted.quota_block(shared)
+    assert hosted.quota_block(hosted.ModelChoice(provider="groq", model="m", source="hosted")) is None
+
+
+def test_quota_hit_reads_status_or_error_text(hosted_mod):
+    hosted, _ = hosted_mod
+    assert hosted.quota_hit({"llm_status": 429})
+    assert hosted.quota_hit({"llm_error": "HTTP 429 Too Many Requests"})
+    assert not hosted.quota_hit({"llm_status": 500, "llm_error": "server error"})
+
+
+def test_bootstrap_falls_back_to_snapshot_when_install_fails(hosted_mod, monkeypatch):
+    hosted, session = hosted_mod
+    monkeypatch.setenv("VSIA_BUNDLE_URL", "https://example.test/b.tar.gz")
+    monkeypatch.setenv("VSIA_EMBED_PROVIDER", "")
+    monkeypatch.delenv("VSIA_BUNDLE_SHA256", raising=False)
+    monkeypatch.setattr(hosted.bundle, "installed", lambda root=None: False)
+    hosted._install_bundle.clear()
+    hosted.bootstrap()
+    hosted._install_bundle.clear()
+    assert "read-only snapshot" in session["warned"] and "VSIA_BUNDLE_SHA256" in session["warned"]
+    assert config.env().vsia_embed_provider == "fastembed"
+
+
+def test_rag_redacts_the_question_before_any_model_call(clean_env):
+    from vsia import rag, retrieval
+
+    prompts: list[str] = []
+
+    def fake_complete_json(system, user, schema, **kw):
+        prompts.append(user)
+        data = (rag.QueryPlan(intent="lookup", search_text="battery") if schema is rag.QueryPlan
+                else rag.ChatAnswer(answer="No context.", refused=True))
+        return llm.LLMResult(data=data, call=None, raw_text="")
+
+    def no_retrieval(*a, **kw):
+        raise RuntimeError("offline")
+
+    clean_env.setattr(rag.llm, "complete_json", fake_complete_json)
+    clean_env.setattr(retrieval, "search_complaints", no_retrieval)
+    rag.answer("I am Jane Doe, call 555-201-7788 or jane.doe@example.com: why does my 12V battery die?")
+    assert len(prompts) == 2
+    for p in prompts:
+        assert "555-201-7788" not in p and "jane.doe@example.com" not in p and "battery" in p

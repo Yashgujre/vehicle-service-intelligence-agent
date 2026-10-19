@@ -57,3 +57,12 @@ within a fold slightly understates what weekly refitting could achieve. Three fo
 The panel has more than about 400 weeks (add folds), forecasts are used for staffing where total volume
 matters more (switch to total-volume WAPE), or a probabilistic score (for example interval score) is
 needed to rank interval quality.
+
+## Update (2026-10-19)
+
+The completed training run `train-20261019T182422Z` (MLflow parent run
+`6c61abbf263f4e77b195d6d4d4d3c595`) reproduced the numbers of the preliminary run after rounding. The
+selection rule chose `glm_poisson` (mean validation WAPE 53.00 against 53.80 for `gbm`), which is
+registered as `vsia-complaint-forecaster` v1 `@champion` (run `98acce0d6c244ef9a75db49e2e9a1ea5`), with
+holdout 1-step WAPE 50.33 against 65.95 for the seasonal naive (ratio 0.763). Source:
+[backtest report](../models/backtest-report.md).

@@ -163,7 +163,7 @@ fires or the guardrail itself errors).
 
 - **Catches:** a narrative that closes its own data block early or impersonates a chat role.
 - **Where:** `src/vsia/guardrails.py` `wrap_untrusted` (lines 205 to 215); used at `src/vsia/agent.py`
-  line 72 (`tag="complaint"`), `src/vsia/rag.py` lines 54 and 109 (`tag="question"`),
+  line 72 (`tag="complaint"`), `src/vsia/rag.py` lines 54 and 112 (`tag="question"`),
   `src/vsia/documents.py` line 208 (`tag="document"`). ADR-0024.
 - **What it does:** removes invisible characters (zero-width, bidirectional controls), maps look-alike
   angle brackets to `<` and `>`, replaces any opening or closing form of its own tag (raw, HTML entity,
@@ -317,12 +317,13 @@ fires or the guardrail itself errors).
 | Order | Guardrail | Where | On failure |
 |---|---|---|---|
 | 1 | Bearer or webhook auth | sections 2.1, 2.2 | 401 |
-| 2 | Question wrapped as `<question>` | `_plan` line 54, `answer` line 109 | Question is **not redacted** (gap G1) |
-| 3 | Router refuses out-of-scope questions without retrieval | `answer` lines 77 to 80 (ADR-0065) | Fixed refusal text, `refused: true` |
-| 4 | Retrieval with redacted query and make or year filters; context capped at 8 complaint hits and 4 per recall namespace, 500 characters each | `answer` lines 82 to 101; `retrieval.search_complaints` | Retrieval error adds `(retrieval unavailable: <type>)` to the context |
-| 5 | Aggregate counts computed in SQL, not by the model | `_stats` | n/a |
-| 6 | Schema `ChatAnswer`, output cap 500 tokens | `answer` line 110 | `LLMError` propagates as HTTP 500 from the API; workflow 04 answers 502 with a fallback text |
-| 7 | `validate_citations` on the `citations` list against the retrieved ids | `answer` line 113 | Ungrounded ids removed; inline bracketed ids inside `answer` are **not** filtered |
+| 2 | `redact()` on the question before the plan call, retrieval and the answer call | `answer` line 76 | n/a. Gap G1 (question not redacted) closed 2026-10-19, fixed in `src/vsia/rag.py` |
+| 3 | Question wrapped as `<question>` | `_plan` line 54, `answer` line 112 | n/a |
+| 4 | Router refuses out-of-scope questions without retrieval | `answer` lines 78 to 81 (ADR-0065) | Fixed refusal text, `refused: true` |
+| 5 | Retrieval with redacted query and make or year filters; context capped at 8 complaint hits and 4 per recall namespace, 500 characters each | `answer` lines 83 to 104; `retrieval.search_complaints` | Retrieval error adds `(retrieval unavailable: <type>)` to the context |
+| 6 | Aggregate counts computed in SQL, not by the model | `_stats` | n/a |
+| 7 | Schema `ChatAnswer`, output cap 500 tokens | `answer` lines 113 to 114 | `LLMError` propagates as HTTP 500 from the API; workflow 04 answers 502 with a fallback text |
+| 8 | `validate_citations` on the `citations` list against the retrieved ids | `answer` line 116 | Ungrounded ids removed; inline bracketed ids inside `answer` are **not** filtered |
 
 ### 7.2 Recall document extraction (`src/vsia/documents.py`)
 
@@ -387,7 +388,8 @@ attacks + 10 benign + 1 rule-id test + 1 threshold test; `wrap_untrusted` = 1 + 
 
 ## 9. Inconsistencies and gaps found while writing this document
 
-No code was changed. Each item is tracked in `ai-risk-register.md`.
+No code was changed in writing this document. Each item is tracked in `ai-risk-register.md`. Rows marked
+closed were fixed in code afterwards, on the date given.
 
 | Item | Location | Issue |
 |---|---|---|
@@ -396,9 +398,9 @@ No code was changed. Each item is tracked in `ai-risk-register.md`.
 | Unused helper | `src/vsia/guardrails.py` `untrusted_instruction` (line 200) | Not used by any production prompt; each prompt carries its own wording |
 | Severity reason | `src/vsia/agent.py` line 152 | The model's reason is kept after an S1 override and can contradict it |
 | Heuristic symptom | `src/vsia/agent.py` line 88 | Unredacted narrative prefix persisted (gap G2) |
-| RAG question | `src/vsia/rag.py` lines 54, 109 | Wrapped but not redacted (gap G1) |
-| Candidate and context blocks | `src/vsia/agent.py` lines 67 to 73; `src/vsia/rag.py` lines 91, 99, 109 | Not neutralised with `wrap_untrusted`; `delimiter_spoof` rule (`guardrails.py` line 252) does not list `candidate_recalls` or `question` |
-| Error text | `src/vsia/llm.py` line 170; `src/vsia/agent.py` line 124 | Validator messages with `input_value=` excerpts are persisted |
+| RAG question | `src/vsia/rag.py` line 76 | Was wrapped but not redacted (gap G1). Closed 2026-10-19, fixed in `src/vsia/rag.py`: `answer()` redacts the question first |
+| Candidate and context blocks | `src/vsia/agent.py` lines 67 to 73; `src/vsia/rag.py` lines 92, 102, 112 | Not neutralised with `wrap_untrusted`; `delimiter_spoof` rule (`guardrails.py` line 252) does not list `candidate_recalls` or `question` |
+| Error text | `src/vsia/llm.py` lines 257 to 264; `src/vsia/agent.py` line 124 | Validator messages with `input_value=` excerpts were persisted (gap G6). Closed 2026-10-19, fixed in `src/vsia/llm.py`: only field paths and error types are recorded |
 | API auth | `src/vsia/api.py` lines 19 to 21 | Fails open when unset; non-constant-time comparison |
 | Workflow 05 prompt | `workflows/n8n/05_triage_agent_native.json`, Triage Agent system message, step 5 | Says "12-character campaign numbers such as 22V412000"; the example and the schema pattern are 9 characters |
 | Workflow 05 VIN | node "Redact PII" | Whole VIN replaced, contradicting ADR-0022 |

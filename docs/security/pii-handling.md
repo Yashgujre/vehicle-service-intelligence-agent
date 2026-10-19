@@ -73,7 +73,7 @@ string.
 
 ## 5. Redaction points
 
-The DFD (`data-flow-diagram.md` section 4) marks these as RP1 to RP8.
+The DFD (`data-flow-diagram.md` section 4) marks these as RP1 to RP10.
 
 | Point | Data | Before reaching | Code | Test |
 |---|---|---|---|---|
@@ -82,9 +82,11 @@ The DFD (`data-flow-diagram.md` section 4) marks these as RP1 to RP8.
 | RP3 | Complaint narratives at index build | Embedding model (Ollama or Pinecone integrated embedding) and stored record text | `scripts/build_index.py` `complaint_records` (line 92) | None |
 | RP4 | Parsed recall document markdown | Storage in `recall_documents.markdown`, rule and LLM extraction, chunking and embedding | `src/vsia/documents.py` `process` (lines 255 to 257) | None |
 | RP5 | `GET /search` query | Vector store | `src/vsia/api.py` line 100 | None |
-| RP6 | Complaint text and free-text model output shown in the dashboard; demo snapshot | Screen; public Streamlit Community Cloud snapshot | `app/data.py` `redact_obj`, `complaint_text`; `scripts/export_demo_snapshot.py` | `test_triage_detail_redacts_text_and_output`, `test_pending_reviews_live_has_candidates_and_redacted_text` (`tests/test_app_data.py`) |
+| RP6 | Complaint text and free-text model output shown in the dashboard, locally and in the public hosted demo; the read-only demo snapshot | Screen; the parquet files in `app/demo_data/`. The hosted demo on Streamlit Community Cloud runs the agent in-process on the redacted data bundle (RP9, ADR-0089, ADR-0091) and shows the snapshot only as a fallback when `VSIA_BUNDLE_URL` is unset or the bundle cannot be installed | `app/data.py` `redact_obj`, `complaint_text`; `scripts/export_demo_snapshot.py` | `test_triage_detail_redacts_text_and_output`, `test_pending_reviews_live_has_candidates_and_redacted_text` (`tests/test_app_data.py`) |
 | RP7 | Span log attributes | Python logs | `src/vsia/observability.py` `_scrub` (text-bearing keys replaced with `[omitted]`, other strings redacted) | `test_timed_logs_genai_attributes_and_scrubs_text` |
 | RP8 | Complaint in the native n8n triage variant | Anthropic via n8n | `workflows/n8n/05_triage_agent_native.json`, node "Redact PII" (JavaScript subset: email, VIN, card, phone, plate) | `scripts/validate_n8n.py` checks syntax only |
+| RP9 | Every complaint narrative in the database copy packed into the hosted demo data bundle | The GitHub release asset and the hosted demo's database, at build time | `src/vsia/bundle.py` `_redacted_db_copy` (called by `build`) | `test_bundle_build_redacts_and_ensure_installs` (`tests/test_hosted.py`) |
+| RP10 | RAG chat question | Plan call, retrieval and answer call | `src/vsia/rag.py` `answer` (line 76) | None |
 | Logs | LLM calls | `llm_calls` table | `src/vsia/llm.py` `complete_json` logs provider, model, purpose, tokens, cost, latency, ok, error, prompt version, reference id; never prompt or reply text | `test_llm_calls_never_store_prompt_text` |
 
 Where redaction does **not** happen (tracked in the risk register):
@@ -92,10 +94,10 @@ Where redaction does **not** happen (tracked in the risk register):
 | Location | What stays unredacted | Risk id |
 |---|---|---|
 | `complaints.summary` | Narrative as published by NHTSA. Kept raw by design so redaction rules can improve and be re-run | Accepted (public source) |
-| `src/vsia/rag.py` lines 54 and 109 | Chat question sent to the LLM (wrapped, not redacted) | R-03 |
+| `src/vsia/rag.py` | Chat question sent to the LLM (wrapped, not redacted). Closed 2026-10-19, fixed in `src/vsia/rag.py` (now RP10) | R-03 (closed) |
 | `src/vsia/agent.py` line 88 | Heuristic fallback copies 160 characters of the raw narrative into `extracted.symptom` | R-04 |
 | Open WebUI volume, n8n execution data | Chat questions and full message history (pipe sends `messages` and `user_id`) | R-05 |
-| `llm_calls.error`, `confidence_signals.llm_error` | Validator messages that quote `input_value=` from model output | R-06 |
+| `llm_calls.error`, `confidence_signals.llm_error` | Validator messages that quote `input_value=` from model output. Closed 2026-10-19, fixed in `src/vsia/llm.py` (field paths and error types only) | R-06 (closed) |
 | `src/vsia/nhtsa.py` line 86 | `vin_prefix` stored as returned, not truncated to 11 characters | R-27 |
 | LlamaCloud upload (`documents.py` lines 59 to 63) | Whole PDF before parsing, when `LLAMA_CLOUD_API_KEY` is set | R-28 |
 
@@ -219,8 +221,9 @@ Other limitations:
 3. Span logs go through `observability._scrub`: text-bearing attributes are replaced with `[omitted]`
    and other strings are redacted.
 4. `confidence_signals.pii_redactions` stores the number of redactions per record, not the values.
-5. Exception: validator error messages can carry `input_value=` excerpts of model output into
-   `llm_calls.error` (risk R-06).
+5. Validator error messages in `llm_calls.error` and `confidence_signals.llm_error` hold field paths and
+   error types only, never the model's reply (`src/vsia/llm.py` `complete_json`). The earlier exception,
+   `input_value=` excerpts of model output (risk R-06), was closed 2026-10-19, fixed in `src/vsia/llm.py`.
 
 ## 9. Re-running the measurements
 

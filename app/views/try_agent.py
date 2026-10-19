@@ -132,10 +132,12 @@ if run and complaint is not None:
         fell_back = None
         if hosted.quota_hit(rec.confidence_signals) and choice.source == "hosted" and llm.api_key("groq") \
                 and choice.provider != "groq":
-            groq_model = config.llm_model("groq")
-            rec = agent.triage(complaint, provider="groq", model=groq_model, run_id=run_id, persist=persist,
-                               enqueue=persist)
-            fell_back = f"Groq ({groq_model})"
+            backup = hosted.ModelChoice(provider="groq", model=config.llm_model("groq"), source="hosted")
+            if not hosted.quota_block(backup):
+                rec = agent.triage(complaint, provider="groq", model=backup.model, run_id=run_id,
+                                   persist=persist, enqueue=persist)
+                hosted.count_ai_calls(backup, 1)
+                fell_back = backup.label
     st.session_state["last_run"] = {"rec": rec, "truth": truth, "text": complaint.summary, "crash": complaint.crash,
                                     "fire": complaint.fire, "persist": persist, "fell_back": fell_back,
                                     "choice": choice.label}

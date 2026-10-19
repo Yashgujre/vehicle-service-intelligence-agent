@@ -63,3 +63,9 @@ security documentation on 2026-10-19 found two call sites that do not redact: th
   consumer reading `complaints.summary` without `redact()`), or
 - a non-public data source is added (redact at ingestion, option B), or
 - the redaction rules have been stable for two releases and re-ingestion becomes cheap.
+
+## Update (2026-10-19)
+
+The RAG chat call site named under "Trade-offs accepted" now redacts: `answer()` in `src/vsia/rag.py`
+calls `guardrails.redact()` on the question (line 76) before the plan call, retrieval and the answer call.
+Risk R-03 and gap G1 are closed. The heuristic fallback's `extracted.symptom` (risk R-04) is unchanged.

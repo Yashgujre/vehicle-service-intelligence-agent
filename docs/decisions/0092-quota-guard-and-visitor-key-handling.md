@@ -21,6 +21,9 @@ not stored or leaked.
   1,000-per-day free limit, which leaves room for retries and the owner's own runs).
 - When a cap is hit, the page says why and offers the two alternatives: the visitor's own key or the offline
   classifier.
+- **Groq backup:** when the shared Gemini key returns HTTP 429 and the host set `GROQ_API_KEY`, the triage
+  page retries once on Groq. The retry passes the same session and daily checks (against Groq's own count)
+  and counts as one more session call; if either cap is hit, the case stays on the offline fallback.
 - **Visitor keys:** a password field, kept in that browser session's state, passed per request through a
   context variable (`vsia.llm.use_keys`). They are never written to the database, logs or `llm_calls`. The
   gateway's error strings never include request headers, where keys travel.
@@ -38,6 +41,9 @@ not stored or leaked.
 
 The daily cap counts every call for the provider, including calls made with visitors' own keys, so it is
 conservative. The session cap resets if a visitor opens a new browser session; the daily cap still holds.
+The daily count lives in the container's SQLite file, so it restarts at zero when the app reboots or wakes
+from sleep; Google's own 1,000-per-day free limit is the backstop, and it fails closed (HTTP 429, offline
+fallback, human review), never into paid usage, because the key's project has no billing.
 
 ## Consequences
 

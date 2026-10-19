@@ -20,7 +20,7 @@ adds a triage-specific component-overlap rule on top of this decision.
 returned for this request:
 
 - triage: the union of `recall_lookup` and `recall_search` campaign numbers (`vsia/agent.py` line 135);
-- RAG chat: the complaint and recall ids placed in the context block (`vsia/rag.py` line 113).
+- RAG chat: the complaint and recall ids placed in the context block (`vsia/rag.py` line 116).
 
 Matching ignores case, spaces and dashes and a leading `NHTSA`, `ODI`, `CAMPAIGN` or `RECALL`, and maps
 the short form `22V702` to `22V702000`. It returns the allowed spelling, de-duplicated, in the model's

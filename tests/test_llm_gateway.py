@@ -333,3 +333,18 @@ def test_llm_call_attributes_mapping():
     assert a["gen_ai.request.model"] == "gpt-6-luna"
     assert a["gen_ai.usage.input_tokens"] == 10 and a["gen_ai.usage.output_tokens"] == 5
     assert a["status"] == "error"
+
+
+def test_complete_json_failure_records_no_model_output(tmp_db, monkeypatch):
+    from vsia import llm
+
+    marker = "MODEL-OUTPUT-7731"
+    bad = {**VALID_TRIAGE, "severity": marker, "component": marker}
+    seen: list[dict] = []
+    monkeypatch.setitem(llm._PROVIDERS, "ollama", _fake_provider([json.dumps(bad), json.dumps(bad)], seen))
+    with pytest.raises(llm.LLMError) as exc:
+        llm.complete_json("sys", "user", TriageOutput, purpose="triage", provider="ollama", model="m")
+    error = _rows(tmp_db)[0]["error"]
+    assert "severity" in error
+    assert marker not in error and "input_value" not in error
+    assert marker not in str(exc.value)

@@ -185,9 +185,10 @@ parameter plus `component_primary = 'OTHER'`.
 | Store | State |
 |---|---|
 | `ingestion_runs` | 3 runs: complaints run 1 (inserted 10,645), recalls run 2 (inserted 189, 218 duplicates), complaints run 3 (inserted 0, 13,367 duplicates, 819 filtered) |
-| `triage_records`, `eval_runs`, `forecasts`, `spike_alerts` | empty |
+| `triage_records`, `eval_runs` | empty |
+| `forecasts`, `spike_alerts` | 320 forecast rows (240 out-of-sample, 80 for 4 future weeks) and 18 spike alerts, all with run id `98acce0d6c244ef9a75db49e2e9a1ea5` (`detect` with the champion) |
 | `llm_calls` | 3 rows (two `smoke`, one `triage` with `qwen2.5:3b`, `triage-v1`, no matching triage record) |
-| MLflow `vsia-forecast` | one parent run `train-20261019T054635Z` (status FAILED, `data_fingerprint` `ba0e4154ef3b8c37`, 249 weeks, 20 series after pooling 4 components, first week 2022-01-03, last week 2026-10-05, holdout from 2026-07-20); candidate runs `naive`, `snaive52`, `ma4`, `ma8`, `ses` FINISHED, `glm_poisson` FAILED; no registered model version and no `champion` alias |
+| MLflow `vsia-forecast` | four parent runs. Three FAILED while logging a candidate model (`train-20261019T054635Z`, `train-20261019T182318Z`, `train-20261019T182351Z`; ADR-0055). `train-20261019T182422Z` (run `6c61abbf263f4e77b195d6d4d4d3c595`, `data_fingerprint` `ba0e4154ef3b8c37`, 249 weeks, 20 series after pooling 4 components, first week 2022-01-03, last week 2026-10-05, holdout from 2026-07-20) FINISHED with all seven candidate runs FINISHED. Registered model `vsia-complaint-forecaster` version 1 (READY, run `98acce0d6c244ef9a75db49e2e9a1ea5`, `glm_poisson`) holds the `champion` alias |
 | MLflow `vsia-triage-eval` | no runs |
 | `data/index/*/info.json` | `recalls` 407 records, `recall_docs` 352 records, `nomic-embed-text`, 768 dimensions; `complaints` namespace not yet written |
 
@@ -219,5 +220,6 @@ These are facts about the current code, recorded so that nobody assumes a trace 
    only an `updated_at` timestamp per namespace.
 10. **Workflow 05 bypasses the gateway**, so its triage records have no `llm_calls` row and no review
     queue entry (ADR-0075).
-11. **Forecast plots without a registered run.** `docs/models/forecast-plots/*.png` were written at the
-    time of the failed `train-20261019T054635Z` run; no champion exists to which they belong.
+11. **Forecast plots and the registered run (resolved 2026-10-19).** `docs/models/forecast-plots/*.png`
+    were rewritten at 18:24 UTC by the completed run `train-20261019T182422Z`, which also logs them to its
+    parent run; they belong to the run that registered the current champion.

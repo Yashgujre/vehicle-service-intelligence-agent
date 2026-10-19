@@ -32,9 +32,21 @@ PROVIDER_LABELS = {"gemini": "Google Gemini", "groq": "Groq", "openai": "OpenAI"
                    "ollama": "Ollama (local)", "heuristic": "Offline classifier"}
 
 
+@st.cache_resource(show_spinner="First start: downloading the demo dataset (about a minute)...")
+def _install_bundle(url: str, sha256: str | None) -> str | None:
+    """One attempt per server process; returns the error text, or None on success."""
+    try:
+        bundle.ensure(url, sha256)
+    except Exception as e:  # noqa: BLE001
+        return f"{type(e).__name__}: {e}"[:300]
+    db.engine.cache_clear()
+    return None
+
+
 def bootstrap() -> None:
     """Fetch the demo data bundle on first start when VSIA_BUNDLE_URL is set and data/ is empty. A hosted
-    container has no Ollama, so it embeds queries in-process (same model, same vectors)."""
+    container has no Ollama, so it embeds queries in-process (same model, same vectors). If the download or
+    checksum fails, no database file exists and the pages fall back to the read-only snapshot."""
     url = os.getenv("VSIA_BUNDLE_URL")
     if not url:
         return
@@ -43,9 +55,9 @@ def bootstrap() -> None:
         config.env.cache_clear()
     if bundle.installed():
         return
-    with st.spinner("First start: downloading the demo dataset (about a minute)..."):
-        bundle.ensure(url, os.getenv("VSIA_BUNDLE_SHA256"))
-    db.engine.cache_clear()
+    if err := _install_bundle(url, os.getenv("VSIA_BUNDLE_SHA256")):
+        st.warning("The demo dataset could not be installed, so this app is showing the read-only snapshot "
+                   f"and the agent is unavailable. Cause: {err}")
 
 
 @st.cache_data(ttl=60, show_spinner=False)

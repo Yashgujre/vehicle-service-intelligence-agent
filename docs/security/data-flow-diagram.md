@@ -120,7 +120,7 @@ flowchart LR
   classDef untrusted stroke:#c0392b,stroke-width:3px;
   classDef redaction stroke:#1e8449,stroke-width:3px;
   class PUB,NAPI,NPDF,LC,CHAT,REV untrusted;
-  class DOCS,IDX,AGENT redaction;
+  class DOCS,IDX,AGENT,RAG redaction;
 ```
 
 Notes on the level 0 view:
@@ -131,8 +131,8 @@ Notes on the level 0 view:
   `127.0.0.1:5000` for SSH tunnels only (ADR-0081, ADR-0083).
 - `ING`, `FETCH`, `DOCS` and `IDX` are batch jobs. `ING` is also triggered over the API by n8n workflow 01
   (`POST /ingest/daily`); `FETCH`, `DOCS` and `IDX` are run by the operator from the CLI.
-- `RAG` is not outlined green because it does **not** redact the chat question before the LLM call
-  (see section 4, gap G1).
+- `RAG` is outlined green because `rag.answer` redacts the chat question before the plan call, retrieval
+  and the answer call (`src/vsia/rag.py` line 76, RP10). This closed gap G1 on 2026-10-19 (section 5).
 
 ## 2. Level 1: triage agent request path with guardrail positions
 
@@ -234,11 +234,11 @@ schema validation (V1) and the semantic checks (V2 to V5). Each step is describe
 | F32, F33 | Triage agent | Vector store | Redacted query (first 2,000 characters) and vehicle filter | Zone 2 to 3 or 0 | Local files or HTTPS to Pinecone | Results are untrusted retrieved text | **Redacted** | `vsia/retrieval.py` `search_recalls_for_complaint` |
 | F34, F35 | RAG chat | Vector store | Redacted search text and filters | Zone 2 to 3 or 0 | Local files or HTTPS | Results are untrusted retrieved text | **Redacted** (`retrieval.py` line 566) | `vsia/rag.py` `answer` |
 | F36 | Triage agent | LLM gateway | System prompt plus redacted, wrapped complaint and candidate recall text | Internal | In-process | Yes | **Redacted** complaint; recall text public | `vsia/agent.py` `_user_message` |
-| F37 | RAG chat | LLM gateway | Plan and answer prompts: wrapped question plus retrieved context | Internal | In-process | Yes | **Question not redacted** (gap G1) | `vsia/rag.py` `_plan`, `answer` |
+| F37 | RAG chat | LLM gateway | Plan and answer prompts: wrapped question plus retrieved context | Internal | In-process | Yes | **Redacted** question (`rag.py` line 76); gap G1 closed 2026-10-19, fixed in `src/vsia/rag.py` | `vsia/rag.py` `_plan`, `answer` |
 | F38 | LLM gateway | Anthropic | Messages API with JSON schema output | Zone 2 to 0 and back | HTTPS, `x-api-key` | Reply is untrusted output | As F36 or F37 | `vsia/llm.py` `_call_anthropic` |
 | F39 | LLM gateway | OpenAI | Responses API with strict JSON schema | Zone 2 to 0 and back | HTTPS, bearer API key | Reply is untrusted output | As F36 or F37 | `vsia/llm.py` `_call_openai` |
 | F40 | LLM gateway | Ollama | `/api/chat` with `format` schema | Zone 2 to 0, or localhost on the laptop | HTTP, no auth | Reply is untrusted output | As F36 or F37 | `vsia/llm.py` `_call_ollama` |
-| F41 | LLM gateway | Postgres `llm_calls` | Provider, model, purpose, tokens, cost, latency, ok, error, prompt version, reference id | Zone 2 to 3 | SQLAlchemy | No prompt text | Metadata; `error` can hold validator excerpts (gap G6) | `vsia/llm.py` `complete_json`, `vsia/db.py` `log_llm_call` |
+| F41 | LLM gateway | Postgres `llm_calls` | Provider, model, purpose, tokens, cost, latency, ok, error, prompt version, reference id | Zone 2 to 3 | SQLAlchemy | No prompt text | Metadata; validation errors are recorded as field paths and error types only; gap G6 closed 2026-10-19, fixed in `src/vsia/llm.py` | `vsia/llm.py` `complete_json`, `vsia/db.py` `log_llm_call` |
 
 ## 4. Where untrusted text enters, and where redaction happens
 
@@ -248,7 +248,7 @@ Untrusted entry points (red outline):
 |---|---|---|---|
 | Owner complaint narratives | F1 | Free text from the public | Stored as received; `redact()` and `detect_injection()` at triage time |
 | Recall PDFs | F4, F8 | Third-party documents | `redact()` before storage; wrapped in `<document>` for the LLM fallback |
-| Chat questions | F15, F21 | Free text from logged-in chat users | Wrapped in `<question>`; **not redacted** before the LLM |
+| Chat questions | F15, F21 | Free text from logged-in chat users | `redact()` in `rag.answer` (RP10), then wrapped in `<question>` before the LLM; still unredacted in Open WebUI and n8n (gap G4) |
 | Review decisions | F16 | JSON from reviewers | Pydantic `ReviewDecision` schema; header auth |
 | Caller-supplied complaint on `POST /triage` | F20, F29 | Any `Complaint` JSON | Bearer token; same triage guardrails |
 | Retrieved records | F32 to F35 | Indexed text (complaints, recall docs) | Complaint and document text redacted at index time; not tag-neutralised (gap G3) |
@@ -280,18 +280,18 @@ threat model and the risk register. No code was changed in writing this document
 
 | ID | Gap | Flow | Location |
 |---|---|---|---|
-| G1 | The RAG chat question reaches the LLM provider wrapped but not redacted | F37 | `src/vsia/rag.py` lines 54 and 109 |
+| G1 | The RAG chat question reaches the LLM provider wrapped but not redacted. **Closed 2026-10-19, fixed in `src/vsia/rag.py`**: `answer()` redacts the question at line 76, before the plan, retrieval and answer calls | F37 | `src/vsia/rag.py` line 76 |
 | G2 | The heuristic fallback copies the first 160 characters of the **unredacted** summary into `extracted.symptom`, which is persisted and returned by the API | F31 | `src/vsia/agent.py` line 88 |
-| G3 | Candidate recall text (`<candidate_recalls>`) and RAG context (`<context>`) are inserted without `wrap_untrusted()` neutralisation, so a retrieved chunk can contain a closing tag | F36, F37 | `src/vsia/agent.py` lines 67 to 73; `src/vsia/rag.py` lines 91, 99, 109 |
+| G3 | Candidate recall text (`<candidate_recalls>`) and RAG context (`<context>`) are inserted without `wrap_untrusted()` neutralisation, so a retrieved chunk can contain a closing tag | F36, F37 | `src/vsia/agent.py` lines 67 to 73; `src/vsia/rag.py` lines 92, 102, 112 |
 | G4 | Open WebUI sends the full message history and user id to n8n; n8n keeps execution data for 336 hours; neither is redacted | F21, F24 | `openwebui/vsia_pipe.py` line 98; `docker-compose.yml` line 78 |
 | G5 | Workflow 05 bypasses the Python guardrails: partial redaction, no injection score, no citation grounding against tool output, no severity rule, no review-queue row | F25 to F27 | `workflows/n8n/05_triage_agent_native.json` |
-| G6 | `llm_calls.error` and `confidence_signals.llm_error` store Pydantic error text, which includes `input_value=` excerpts of model output | F41 | `src/vsia/llm.py` line 170; `src/vsia/agent.py` line 124 |
+| G6 | `llm_calls.error` and `confidence_signals.llm_error` store Pydantic error text, which includes `input_value=` excerpts of model output. **Closed 2026-10-19, fixed in `src/vsia/llm.py`**: `complete_json` records only field paths and error types (or the JSON decode position); `agent.py` line 124 stores that same message | F41 | `src/vsia/llm.py` lines 257 to 264; `src/vsia/agent.py` line 124 |
 | G7 | Raw PDFs go to LlamaCloud before redaction when the key is set | F7 | `src/vsia/documents.py` lines 59 to 63 |
 | G8 | `vin_prefix` is stored as NHTSA returns it, without truncation to 11 characters | F2 | `src/vsia/nhtsa.py` line 86 |
 | G9 | `docs/architecture/deployment.md` said the dashboard reads the VM API with the bearer token; `app/` contains no HTTP client and reads the database or the demo snapshot. deployment.md was corrected on 2026-10-19 (no `VSIA_API_TOKEN` in Streamlit secrets); F17 is kept for the VM design | F17 | `app/data.py` lines 1 to 13 |
-| G10 | The bundle checksum is verified only when `VSIA_BUNDLE_SHA256` is set; without it any file served at `VSIA_BUNDLE_URL` is unpacked, including the joblib classifier and calibrators, which run code when loaded | F45 | `src/vsia/bundle.py` `ensure` |
+| G10 | The bundle checksum was verified only when `VSIA_BUNDLE_SHA256` was set; without it any file served at `VSIA_BUNDLE_URL` was unpacked, including the joblib classifier and calibrators, which run code when loaded. **Closed 2026-10-19, fixed in `src/vsia/bundle.py` and `app/hosted.py`**: `ensure` refuses to install without the checksum, and a failed install leaves no database, so the pages fall back to the read-only snapshot with a warning; tests `test_bundle_build_redacts_and_ensure_installs`, `test_bootstrap_falls_back_to_snapshot_when_install_fails` | F45 | `src/vsia/bundle.py` `ensure`; `app/hosted.py` `bootstrap` |
 | G11 | Reviewer name and note typed on the hosted Human review page are stored unredacted in `labels` in the shared database until the app restarts | F53 | `app/views/review.py` lines 78 to 80 |
-| G12 | The Groq retry after a Gemini 429 on the triage page is not counted against the session cap and is not checked against the daily cap for Groq | F51 | `app/views/try_agent.py` lines 131 to 138 |
+| G12 | The Groq retry after a Gemini 429 on the triage page was not counted against the session cap and not checked against the daily cap for Groq. **Closed 2026-10-19, fixed in `app/views/try_agent.py`**: the retry runs only if `quota_block` allows it for Groq, and it counts one session call (ADR-0092); test `test_quota_guard_caps_session_and_day_for_the_shared_key_only` | F51 | `app/views/try_agent.py` Groq backup block |
 
 ## 6. Hosted demo (Streamlit Community Cloud)
 
@@ -358,14 +358,14 @@ flowchart LR
 `OPL` is outlined green because `vsia.bundle.build` redacts every complaint narrative in the database copy
 before packing (75 narratives changed in the first build, ADR-0091). `RAGH` is green here because
 `rag.answer` redacts the question before the plan and answer calls (`src/vsia/rag.py` line 76); that
-change also closes gap G1 in code, and the G1 entries in this document set predate it.
+change also closed gap G1 on 2026-10-19 (section 5).
 
 | ID | From | To | Data | Boundary crossed | Transport and auth | Untrusted? | PII state | Code |
 |---|---|---|---|---|---|---|---|---|
 | F42 | Visitor browser | Streamlit pages | Picked complaint id, written complaint (up to 2,000 characters), chat question (up to 500 characters), review decisions with reviewer and note, model choice, and optionally the visitor's API key | H0 to H1 | HTTPS to Community Cloud; no login | **Yes, main entry point of the demo** | Whatever the visitor types; the "Write your own" tab asks for no personal information | `app/views/try_agent.py`, `ask.py`, `review.py`, `app/hosted.py` `model_picker` |
 | F43 | Streamlit pages | Session state | Visitor key, chat history, last run, shared-call counter | Within H1 | Streamlit session memory, per browser session | Yes | Visitor key is a secret; never persisted | `app/hosted.py`, `app/views/ask.py` |
 | F44 | Operator laptop | GitHub release asset | `vsia-demo-bundle.tar.gz` (redacted database, three index namespaces, classifier, calibrators, routing files) | Laptop to H0 | `gh release create` over HTTPS, GitHub account | n/a (outbound) | **Redacted** narratives | `scripts/build_demo_bundle.py`, `vsia.bundle.build` |
-| F45 | GitHub release asset | Bootstrap | The bundle, on first start | H0 to H1 | HTTPS download, redirects followed; sha256 compared with `VSIA_BUNDLE_SHA256` when set (gap G10) | **Yes, tampering entry point** | Redacted | `vsia.bundle.ensure` |
+| F45 | GitHub release asset | Bootstrap | The bundle, on first start | H0 to H1 | HTTPS download, redirects followed; sha256 must match `VSIA_BUNDLE_SHA256`, which is mandatory (gap G10 closed) | **Yes, tampering entry point** | Redacted | `vsia.bundle.ensure` |
 | F46 | Bootstrap | Container file system | Unpacked files | H1 to H2 | Local file system; only regular files and directories under `data/`, no absolute paths or `..` | Yes until verified | Redacted | `vsia.bundle._safe_members` |
 | F47 | Triage agent | SQLite | Reads complaints and recalls; for a picked complaint writes `triage_records` and `review_queue` (run id `playground-<session>`); for a written complaint writes no triage or review row (`persist=False`) | H1 to H2 | SQLAlchemy | Model output after validation | Output derived from redacted text | `app/views/try_agent.py` lines 128 to 138 |
 | F48 | RAG chat | Local index and SQLite | Redacted search text and filters; aggregate counts | H1 to H2 | Local files | Results are untrusted retrieved text | **Redacted** | `vsia/rag.py` `answer` |

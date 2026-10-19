@@ -61,3 +61,12 @@ artifact. The registered model's tags record whether it beats the seasonal naive
 
 A benchmark beats the champion's validation WAPE by more than 2 points on two consecutive training runs,
 or the panel grows enough (more history or finer series) for per-series models to have adequate data.
+
+## Update (2026-10-19)
+
+The completed training run `train-20261019T182422Z` (MLflow parent run
+`6c61abbf263f4e77b195d6d4d4d3c595`) reproduced the preliminary numbers above after rounding, and the
+selection rule registered `glm_poisson` as `vsia-complaint-forecaster` v1 `@champion` (run
+`98acce0d6c244ef9a75db49e2e9a1ea5`). Its holdout 1-step WAPE is 50.33 against 65.95 for the seasonal
+naive (ratio 0.763, tag `beats_seasonal_naive_1step` True). SES's validation WAPE (50.32) is 2.68 points
+below the champion's (53.00) on this one run. Source: [backtest report](../models/backtest-report.md).
