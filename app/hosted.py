@@ -197,15 +197,24 @@ def model_picker() -> ModelChoice:
     with st.sidebar:
         st.markdown("**AI model**")
         labels = [o[0] for o in options]
-        pick = st.radio("AI model", labels, key="model_pick", label_visibility="collapsed")
+        # Streamlit drops a widget's state when another page is shown, so the choice is kept under a second key.
+        saved = st.session_state.get("model_pick_saved")
+        pick = st.radio("AI model", labels, index=labels.index(saved) if saved in labels else 0, key="model_pick",
+                        label_visibility="collapsed")
+        st.session_state["model_pick_saved"] = pick
         _, provider, source = options[labels.index(pick)]
         keys: dict[str, str] = {}
         if source == "own":
-            provider = st.selectbox("Provider", ["gemini", "groq", "openai", "anthropic"],
+            own = ["gemini", "groq", "openai", "anthropic"]
+            saved_p = st.session_state.get("own_provider_saved")
+            provider = st.selectbox("Provider", own, index=own.index(saved_p) if saved_p in own else 0,
                                     format_func=lambda p: PROVIDER_LABELS[p], key="own_provider")
+            st.session_state["own_provider_saved"] = provider
             name, url = FREE_KEY_LINKS[provider]
             key = st.text_input("API key", type="password", key=f"own_key_{provider}",
+                                value=st.session_state.get(f"own_key_saved_{provider}", ""),
                                 help="Used only for your requests in this browser session. Never stored or logged.")
+            st.session_state[f"own_key_saved_{provider}"] = key
             st.caption(f"Get a key: [{name}]({url}). Gemini and Groq have free tiers; no card needed.")
             if key:
                 keys[provider] = key.strip()
