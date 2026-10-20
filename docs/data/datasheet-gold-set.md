@@ -28,9 +28,8 @@ Consequences for anyone reading an evaluation result:
   The promotion path exists: `python eval/build_gold.py --promote data/gold/gold_set_review.csv` writes
   `gold_hand` rows to `labels`. No row has been promoted yet.
 
-Code comments in `eval/build_gold.py`, `eval/splits.py` and `src/vsia/classifier.py` cite ADR-0040 to
-ADR-0046 and `docs/evaluation/labeling-guide.md` for these rules; those documents do not exist. This
-datasheet and ADR-0005 are the current written record.
+The rules are recorded in ADR-0040 to ADR-0046. How a person hand-verifies rows and promotes them is in
+the [labeling guide](../evaluation/labeling-guide.md).
 
 ## Motivation
 

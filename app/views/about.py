@@ -42,7 +42,12 @@ st.markdown(
 )
 
 st.subheader("Links")
-st.markdown("- Source repository: _link to be added_\n- Demo video: _link to be added_")
+st.markdown(
+    "- Source repository: [github.com/Yashgujre/vehicle-service-intelligence-agent]"
+    "(https://github.com/Yashgujre/vehicle-service-intelligence-agent)\n"
+    "- Live demo: [Streamlit Community Cloud]"
+    "(https://vehicle-service-intelligence-agent-nmwg8thucvttua8xzdtvi6.streamlit.app/)"
+)
 
 st.subheader("This deployment")
 st.caption(f"Data source: {src.reason}. Read-only: {'yes' if src.readonly else 'no'}. "

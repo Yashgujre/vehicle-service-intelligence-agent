@@ -96,17 +96,25 @@ def _safe_members(tar: tarfile.TarFile) -> list[tarfile.TarInfo]:
     return ok
 
 
-def installed(root: Path = config.REPO_ROOT) -> bool:
-    return (root / "data" / DB_NAME).exists() and (root / MARKER).exists()
+def installed(root: Path = config.REPO_ROOT, sha256: str | None = None) -> bool:
+    """True when a bundle is unpacked; with `sha256`, only when it is that exact bundle."""
+    if not ((root / "data" / DB_NAME).exists() and (root / MARKER).exists()):
+        return False
+    if sha256 is None:
+        return True
+    try:
+        return json.loads((root / MARKER).read_text()).get("sha256") == sha256.strip().lower()
+    except (OSError, ValueError):
+        return False
 
 
 def ensure(url: str, sha256: str | None, root: Path = config.REPO_ROOT) -> dict:
-    """Download and unpack the bundle unless it is already installed. The sha256 is mandatory: the bundle
-    carries joblib files, and loading a joblib file runs code."""
-    if installed(root):
-        return json.loads((root / MARKER).read_text())
+    """Download and unpack the bundle unless that exact bundle is already installed. The sha256 is mandatory:
+    the bundle carries joblib files, and loading a joblib file runs code."""
     if not sha256:
         raise ValueError("VSIA_BUNDLE_SHA256 must be set together with VSIA_BUNDLE_URL")
+    if installed(root, sha256):
+        return json.loads((root / MARKER).read_text())
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "bundle.tar.gz"
         with httpx.stream("GET", url, follow_redirects=True, timeout=300.0) as r:

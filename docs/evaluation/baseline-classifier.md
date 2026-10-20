@@ -136,4 +136,4 @@ Fit on the earliest 7842 TRAIN complaints, tested on the latest 1961 (filed on o
 - Labels are NHTSA intake codes (silver). Intake coding is itself noisy and multi-label; the any-label metric exists because many complaints legitimately carry two or three components.
 - `OTHER` (NHTSA 'UNKNOWN OR OTHER') is a catch-all with no consistent vocabulary, so it is hard for any text model.
 - GOLD has 200 rows; per-class numbers for classes with 3 to 7 rows are anecdotal.
-- Not yet measured: agreement with hand labels (needs the hand review in `docs/evaluation/labeling-guide.md`).
+- Not yet measured: agreement with hand labels (needs the hand review in [labeling-guide.md](labeling-guide.md)).

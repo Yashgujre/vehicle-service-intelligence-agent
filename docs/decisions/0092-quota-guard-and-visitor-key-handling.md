@@ -19,7 +19,9 @@ not stored or leaked.
 - **Per day:** the app counts today's `llm_calls` rows for the provider since midnight Pacific (when Gemini
   quotas reset) and stops using the shared key at `VSIA_HOSTED_DAILY_LLM_CALLS` (default 400, chosen
   when Google listed 1,000 requests per day for the free tier; Google now shows free-tier limits only
-  per project in AI Studio, so the owner should keep the cap below the value shown there).
+  per project in AI Studio, so the owner should keep the cap below the value shown there). The count
+  starts at the later of midnight Pacific and the bundle install time, so calls the owner made locally
+  before building the bundle (for example the evaluation run) do not use up the visitors' allowance.
 - When a cap is hit, the page says why and offers the two alternatives: the visitor's own key or the offline
   classifier.
 - **Groq backup:** when the shared Gemini key returns HTTP 429 and the host set `GROQ_API_KEY`, the triage

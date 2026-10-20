@@ -483,7 +483,7 @@ def write_report(m: dict, path: Path) -> None:
              "for any text model.")
     L.append("- GOLD has 200 rows; per-class numbers for classes with 3 to 7 rows are anecdotal.")
     L.append("- Not yet measured: agreement with hand labels (needs the hand review in "
-             "`docs/evaluation/labeling-guide.md`).")
+             "[labeling-guide.md](labeling-guide.md)).")
     L.append("")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(L))

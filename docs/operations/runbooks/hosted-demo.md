@@ -73,7 +73,8 @@ The download URL is
 ## Routine operations
 
 - **Refresh data:** re-ingest and re-index locally, rebuild the bundle, publish a new release tag
-  (`demo-data-v2`), update the two `VSIA_BUNDLE_*` secrets, then reboot the app from **Manage app**.
+  (`demo-data-v2`), update the two `VSIA_BUNDLE_*` secrets, then reboot the app from **Manage app**. The
+  app downloads the new bundle because its checksum differs from the installed one.
 - **Rotate the Gemini key:** create a new key, update the secret, reboot, then delete the old key.
 - **App asleep:** Community Cloud sleeps apps after 12 hours without traffic. Any visitor can wake it with
   the button on the sleep page; it takes about a minute.

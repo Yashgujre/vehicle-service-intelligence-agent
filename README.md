@@ -5,7 +5,9 @@ owner complaints and recall campaigns, triages each complaint with an LLM agent 
 linked recalls, calibrated confidence), sends uncertain cases to human review, answers questions with cited
 sources, and forecasts weekly complaint volume per component with spike alerts.
 
-**Live demo:** _link added after deploy_ (free; no sign-up; runs on a free-tier model).
+**Live demo:** [open the app on Streamlit Community Cloud](https://vehicle-service-intelligence-agent-nmwg8thucvttua8xzdtvi6.streamlit.app/)
+(free; no sign-up; runs on a free-tier model). If the app is asleep, click the wake-up button and wait about a
+minute.
 
 ## Try it in three minutes
 
@@ -101,6 +103,8 @@ Hosting the free public demo: [hosted-demo runbook](docs/operations/runbooks/hos
 
 ## Documentation
 
+Full map, grouped by the question each document answers: [docs/README.md](docs/README.md).
+
 | Topic | Documents |
 |---|---|
 | Design | [design doc](docs/design/design-doc.md) |
@@ -109,7 +113,7 @@ Hosting the free public demo: [hosted-demo runbook](docs/operations/runbooks/hos
 | Data | [lineage](docs/data/lineage.md), [data dictionary](docs/data/data-dictionary.md), datasheets for the [corpus](docs/data/datasheet-nhtsa-corpus.md) and the [gold set](docs/data/datasheet-gold-set.md) |
 | LLM | [tools](docs/llm/tools.md), prompts for [triage](docs/llm/prompts/triage.md), [RAG](docs/llm/prompts/rag.md), [recall extraction](docs/llm/prompts/recall-extraction.md) |
 | Security and AI risk | [threat model (STRIDE)](docs/security/threat-model.md), [data-flow diagram](docs/security/data-flow-diagram.md), [AI risk register](docs/security/ai-risk-register.md), [guardrails](docs/security/guardrails.md), [PII handling](docs/security/pii-handling.md) |
-| Evaluation | [eval plan](docs/evaluation/eval-plan.md), [metrics](docs/evaluation/metrics.md), [baseline classifier](docs/evaluation/baseline-classifier.md) |
+| Evaluation | [eval plan](docs/evaluation/eval-plan.md), [metrics](docs/evaluation/metrics.md), [model comparison](docs/evaluation/model-comparison.md), [baseline classifier](docs/evaluation/baseline-classifier.md), [labeling guide](docs/evaluation/labeling-guide.md) |
 | Models | [forecast backtest](docs/models/backtest-report.md), [forecaster model card](docs/models/model-card-forecaster.md) |
 | Human in the loop | [review workflow](docs/hitl/review-workflow.md) |
 | Operations | [SLOs](docs/operations/slos.md), [observability](docs/operations/observability.md), [cost model](docs/operations/cost-model.md), [incident playbook](docs/operations/incident-playbook.md), [runbooks](docs/operations/runbooks/) |
@@ -118,7 +122,7 @@ Hosting the free public demo: [hosted-demo runbook](docs/operations/runbooks/hos
 
 | Part | Status |
 |---|---|
-| Ingestion, PDF parsing, index, triage agent, RAG chat, forecasting, dashboard, API, guardrails | Built and run end to end on the laptop; 172 automated tests pass |
+| Ingestion, PDF parsing, index, triage agent, RAG chat, forecasting, dashboard, API, guardrails | Built and run end to end on the laptop; 174 automated tests pass |
 | Hosted demo path (bundle download, in-process embeddings, offline mode) | Rehearsed locally from a clean copy with no Ollama |
 | Gemini and Groq calls | Covered by tests with mocked HTTP; live calls not yet run |
 | n8n workflows, Open WebUI, Docker Compose, Terraform for the OCI VM | Written and statically validated; not yet executed (ADR-0008) |

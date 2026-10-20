@@ -10,6 +10,7 @@ Model options, in the order the picker offers them:
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -53,9 +54,10 @@ def bootstrap() -> None:
     if not os.getenv("VSIA_EMBED_PROVIDER"):
         os.environ["VSIA_EMBED_PROVIDER"] = "fastembed"
         config.env.cache_clear()
-    if bundle.installed():
+    sha256 = os.getenv("VSIA_BUNDLE_SHA256") or None
+    if bundle.installed(sha256=sha256):
         return
-    if err := _install_bundle(url, os.getenv("VSIA_BUNDLE_SHA256")):
+    if err := _install_bundle(url, sha256):
         st.warning("The demo dataset could not be installed, so this app is showing the read-only snapshot "
                    f"and the agent is unavailable. Cause: {err}")
 
@@ -91,10 +93,19 @@ def _pacific_midnight_utc() -> datetime:
     return now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def _bundle_installed_utc() -> datetime | None:
+    try:
+        info = json.loads((config.REPO_ROOT / bundle.MARKER).read_text())
+        return datetime.fromisoformat(info["installed_at"]).astimezone(timezone.utc).replace(tzinfo=None)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def hosted_calls_today(provider: str) -> int:
+    """Calls since midnight Pacific, ignoring calls made locally before the bundle was built and installed."""
+    since = max(filter(None, [_pacific_midnight_utc(), _bundle_installed_utc()]))
     c = db.llm_calls.c
-    q = select(func.count()).select_from(db.llm_calls).where(c.provider == provider,
-                                                              c.created_at >= _pacific_midnight_utc())
+    q = select(func.count()).select_from(db.llm_calls).where(c.provider == provider, c.created_at >= since)
     try:
         with db.engine().connect() as conn:
             return int(conn.execute(q).scalar_one())

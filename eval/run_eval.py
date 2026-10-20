@@ -44,7 +44,9 @@ def pred_path(split: str, provider: str) -> Path:
     return EVAL_DIR / f"{split}_{provider}.jsonl"
 
 
-def predict(split: str, provider: str, limit: int | None = None) -> Path:
+def predict(split: str, provider: str, limit: int | None = None, min_interval_s: float = 0.0) -> Path:
+    """Append one prediction per complaint, resuming after the last one written. Stops at the first rate-limit
+    error (HTTP 429) instead of recording the offline fallback as the provider's answer."""
     rows = load_split(split)[: limit or None]
     out = pred_path(split, provider)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -56,12 +58,18 @@ def predict(split: str, provider: str, limit: int | None = None) -> Path:
         for i, g in enumerate(rows):
             if g["odi_number"] in done:
                 continue
+            started = time.monotonic()
             c: Complaint = agent.load_complaint(g["odi_number"])
             rec = agent.triage(c, provider=provider, run_id=run_id, persist=True, enqueue=False)
+            if rec.confidence_signals.get("llm_status") == 429:
+                log.warning("rate limited at %s/%s %s %s; stopping, rerun to resume", i + 1, len(rows), split,
+                            provider)
+                raise SystemExit(3)
             f.write(json.dumps({"odi_number": g["odi_number"], "record": rec.model_dump(mode="json")}) + "\n")
             f.flush()
             if (i + 1) % 10 == 0:
                 log.info("%s/%s %s %s", i + 1, len(rows), split, provider)
+            time.sleep(max(0.0, min_interval_s - (time.monotonic() - started)))
     return out
 
 
@@ -297,21 +305,23 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--provider", default=None)
     ap.add_argument("--split", default="gold", choices=["gold", "calibration"])
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--min-interval", type=float, default=0.0,
+                    help="minimum seconds between LLM calls, for free tiers with a per-minute limit")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
     provider = a.provider or config.llm_provider()
     if a.step == "predict":
-        print(predict(a.split, provider, a.limit))
+        print(predict(a.split, provider, a.limit, a.min_interval))
     elif a.step == "calibrate":
         r = calibrate(provider)
         print(json.dumps({k: v for k, v in r.items() if k != "curve"}, indent=1))
     elif a.step == "score":
         print(json.dumps(score(provider, a.split)["metrics"], indent=1))
     elif a.step == "all":
-        predict("calibration", provider, a.limit)
+        predict("calibration", provider, a.limit, a.min_interval)
         calibrate(provider)
-        predict("gold", provider, a.limit)
+        predict("gold", provider, a.limit, a.min_interval)
         print(json.dumps(score(provider)["metrics"], indent=1))
     elif a.step == "compare":
         print(compare())

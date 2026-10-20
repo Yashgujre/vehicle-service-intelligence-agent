@@ -230,7 +230,7 @@ flowchart LR
 | Streamlit app and pages | Community Cloud app container | none | Entrypoint `app/streamlit_app.py`; dependencies pinned in `app/requirements.txt` (a copy of `requirements-streamlit.txt`) |
 | Bootstrap (`hosted.bootstrap`, `vsia.bundle.ensure`) | In the app process, on first start | `VSIA_BUNDLE_URL`, `VSIA_BUNDLE_SHA256` | Downloads the bundle when `data/vsia.db` and the bundle marker are missing; sets `VSIA_EMBED_PROVIDER=fastembed` (ADR-0091) |
 | Triage agent and RAG chat | In the app process | Provider keys from secrets, or the visitor's key through `vsia.llm.use_keys()` | Same code as local development (ADR-0089) |
-| AI model picker and quota guard (`app/hosted.py`) | In the app process | `VSIA_HOSTED_DAILY_LLM_CALLS` (default 400) | 15 AI calls per session on the shared key (`SESSION_AI_RUNS`); daily cap counted from `llm_calls` since midnight Pacific (ADR-0092) |
+| AI model picker and quota guard (`app/hosted.py`) | In the app process | `VSIA_HOSTED_DAILY_LLM_CALLS` (default 400) | 15 AI calls per session on the shared key (`SESSION_AI_RUNS`); daily cap counted from `llm_calls` since midnight Pacific or the bundle install, whichever is later (ADR-0092) |
 | Operational database | SQLite file inside the container | none | Shared by all visitors and reset when the app restarts; review writes are enabled because the runbook does not set `VSIA_READONLY` |
 | Vector index, classifier, calibrators, routing files | `data/` inside the container | none | Unpacked from the bundle |
 | Query embedder | In the app process | none | fastembed fp32 model (0.52 GB), downloaded on the first search after a cold start (ADR-0090) |

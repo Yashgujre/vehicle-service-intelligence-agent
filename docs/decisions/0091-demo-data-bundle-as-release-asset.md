@@ -31,7 +31,10 @@ The bundle is published as a GitHub release asset. The app downloads it on first
 (`vsia.bundle.ensure`). The checksum is mandatory: the bundle contains joblib files, and loading a joblib
 file runs code, so an unverified bundle is never installed. If the secret is missing, the download fails or
 the checksum does not match, nothing is unpacked, the app shows a warning with the cause and the pages fall
-back to the read-only snapshot (ADR-0072). The install is attempted once per server process.
+back to the read-only snapshot (ADR-0072). The install is attempted once per server process and per
+checksum: the marker `data/.bundle.json` records the installed sha256, and a different
+`VSIA_BUNDLE_SHA256` triggers a fresh download, so a data refresh does not depend on the container's disk
+being wiped.
 
 ## Options considered
 

@@ -22,7 +22,7 @@ Navigation has two groups: "Try it" (Try the agent, Ask the data) and "Operate" 
 | Human review (`/review`) | Review stats, pending items (lowest confidence first), one accept-or-correct form per item | `vsia.review.pending()` plus `triage_records.confidence_signals.candidates`; writes via `vsia.review.decide()` |
 | Trends and spikes (`/trends`) | Weekly complaints by selected components; forecast vs actual with interval band for holdout and future weeks (latest `run_id`); spike alerts with ratio and an active flag | `complaints`, `forecasts`, `spike_alerts` |
 | Evaluation and cost (`/evaluation`) | Latest eval run per provider, model and split, plus a provider comparison chart when several providers exist; routing threshold curve (coverage vs auto-routed accuracy); LLM calls, error rate, p50/p95 latency and cost per 1,000 calls by provider, model and purpose | `eval_runs` (the nested `metrics` dict written by `eval/run_eval.py`), `data/models/routing_<provider>.json`, `cost_latency_summary()` |
-| About (`/about`) | Architecture paragraph, pipeline pattern and how it transfers to other domains, NHTSA attribution, link placeholders | static |
+| About (`/about`) | Architecture paragraph, pipeline pattern and how it transfers to other domains, NHTSA attribution, source repository and live demo links | static |
 
 Definitions:
 - **Triaged:** distinct complaints with at least one triage record. **Auto-routed %** uses the latest record

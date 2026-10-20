@@ -162,6 +162,10 @@ def test_bundle_build_redacts_and_ensure_installs(tmp_path, monkeypatch):
     con.close()
     assert "555-201-7788" not in texts[0] and texts[1] == "brakes failed"
 
+    assert bundle.installed(dst, m["sha256"]) and not bundle.installed(dst, "f" * 64)
+    with pytest.raises(ValueError, match="checksum"):
+        bundle.ensure("https://example.test/b.tar.gz", "f" * 64, root=dst)
+
 
 def test_bundle_rejects_paths_outside_data(tmp_path):
     buf = io.BytesIO()
@@ -199,7 +203,7 @@ def _log_calls(provider: str, n: int) -> None:
                                              "created_at": datetime.utcnow()} for _ in range(n)])
 
 
-def test_quota_guard_caps_session_and_day_for_the_shared_key_only(hosted_mod):
+def test_quota_guard_caps_session_and_day_for_the_shared_key_only(hosted_mod, monkeypatch):
     hosted, session = hosted_mod
     shared = hosted.ModelChoice(provider="gemini", model="m", source="hosted")
     own = hosted.ModelChoice(provider="gemini", model="m", source="own", keys={"gemini": "k"})
@@ -212,9 +216,21 @@ def test_quota_guard_caps_session_and_day_for_the_shared_key_only(hosted_mod):
     assert hosted.quota_block(own, calls_needed=99) is None
 
     session.clear()
+    monkeypatch.setattr(hosted, "_bundle_installed_utc", lambda: None)
     _log_calls("gemini", config.env().vsia_hosted_daily_llm_calls)
     assert "today's limit" in hosted.quota_block(shared)
     assert hosted.quota_block(hosted.ModelChoice(provider="groq", model="m", source="hosted")) is None
+
+
+def test_daily_cap_ignores_calls_shipped_inside_the_bundle(hosted_mod, monkeypatch):
+    from datetime import datetime, timedelta
+
+    hosted, _ = hosted_mod
+    shared = hosted.ModelChoice(provider="gemini", model="m", source="hosted")
+    _log_calls("gemini", config.env().vsia_hosted_daily_llm_calls)
+    monkeypatch.setattr(hosted, "_bundle_installed_utc", lambda: datetime.utcnow() + timedelta(seconds=1))
+    assert hosted.hosted_calls_today("gemini") == 0
+    assert hosted.quota_block(shared) is None
 
 
 def test_quota_hit_reads_status_or_error_text(hosted_mod):
@@ -229,7 +245,7 @@ def test_bootstrap_falls_back_to_snapshot_when_install_fails(hosted_mod, monkeyp
     monkeypatch.setenv("VSIA_BUNDLE_URL", "https://example.test/b.tar.gz")
     monkeypatch.setenv("VSIA_EMBED_PROVIDER", "")
     monkeypatch.delenv("VSIA_BUNDLE_SHA256", raising=False)
-    monkeypatch.setattr(hosted.bundle, "installed", lambda root=None: False)
+    monkeypatch.setattr(hosted.bundle, "installed", lambda root=None, sha256=None: False)
     hosted._install_bundle.clear()
     hosted.bootstrap()
     hosted._install_bundle.clear()
