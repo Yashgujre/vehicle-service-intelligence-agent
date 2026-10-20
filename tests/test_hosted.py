@@ -21,8 +21,9 @@ VALID = {"extracted": {"symptom": "Car braked by itself"}, "component": "SERVICE
 
 @pytest.fixture
 def clean_env(monkeypatch, tmp_path):
-    for k in ("GEMINI_API_KEY", "GROQ_API_KEY", "VSIA_EMBED_PROVIDER"):
-        monkeypatch.delenv(k, raising=False)
+    for k in ("GEMINI_API_KEY", "GROQ_API_KEY"):
+        monkeypatch.setenv(k, "")  # an empty variable also masks a real key in the developer's .env
+    monkeypatch.delenv("VSIA_EMBED_PROVIDER", raising=False)
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 't.db'}")
     from vsia import db
 

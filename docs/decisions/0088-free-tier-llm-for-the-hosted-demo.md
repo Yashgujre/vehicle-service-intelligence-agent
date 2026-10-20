@@ -64,6 +64,17 @@ the existing structured-output contract (ADR-0007) carries over unchanged.
 - `LLMError` now carries the provider's HTTP status, so callers can tell quota errors from other failures.
 - The model comparison gains two free cloud models next to the local one.
 
+## Update (2026-10-19, after deploy)
+
+The first live call returned HTTP 404: Google no longer offers `gemini-2.5-flash-lite` to new users and
+names `gemini-3.5-flash-lite` as its replacement. The model is now `gemini-3.5-flash-lite` (pinned, not the
+`gemini-flash-lite-latest` alias, so evaluation results stay tied to one model). It is free of charge on
+the free tier, and free-tier content may be used to improve Google's products, as before. The paid list
+price is 0.30 USD input and 2.50 USD output per million tokens (pricing page, 2026-10-19). Google no longer
+publishes per-model free-tier request limits; AI Studio shows them per project. The app's caps (ADR-0092)
+and the 429 fallback are unchanged. The `gemini-2.5-flash-lite` row in the table above is kept as the
+record of what was decided.
+
 ## Revisit when
 
 Google or Groq change their free tiers, the demo regularly exhausts the daily quota, or the owner chooses to

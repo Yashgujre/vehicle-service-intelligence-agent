@@ -14,7 +14,7 @@ of this page.
 |---|---|---|---|---|---|---|
 | Laptop development (ADR-0008) | Native Python in `.venv` | SQLite `data/vsia.db` | Ollama `qwen2.5:3b` (default) or hosted APIs | Local index `data/index/` | CLI and `uvicorn vsia.api:app` | `vsia chat` CLI |
 | OCI VM (this page) | Docker Compose on one Always Free A1 VM | Postgres 16 | Anthropic `claude-haiku-5-5` (or OpenAI) | Pinecone | n8n | Open WebUI |
-| Hosted demo (ADR-0089) | Streamlit Community Cloud; the agent and RAG chat run in-process inside the Streamlit app | Shared, ephemeral SQLite `data/vsia.db` unpacked from the redacted demo bundle (ADR-0091) | Gemini `gemini-2.5-flash-lite` free tier, Groq `openai/gpt-oss-20b` backup, visitor's own key, or the offline classifier (ADR-0088) | Local index from the bundle; queries embedded in-process with fastembed (ADR-0090) | none | Streamlit "Ask the data" page |
+| Hosted demo (ADR-0089) | Streamlit Community Cloud; the agent and RAG chat run in-process inside the Streamlit app | Shared, ephemeral SQLite `data/vsia.db` unpacked from the redacted demo bundle (ADR-0091) | Gemini `gemini-3.5-flash-lite` free tier, Groq `openai/gpt-oss-20b` backup, visitor's own key, or the offline classifier (ADR-0088) | Local index from the bundle; queries embedded in-process with fastembed (ADR-0090) | none | Streamlit "Ask the data" page |
 | Dashboard snapshot (fallback) | Streamlit Community Cloud, or any host without a database | Reads the redacted parquet demo snapshot in `app/demo_data/` (ADR-0072); used when `VSIA_BUNDLE_URL` is unset or no database is reachable | n/a | n/a | n/a | Streamlit app, read-only |
 
 ## C4 deployment diagram
@@ -208,7 +208,7 @@ flowchart LR
   end
   gh["GitHub repository<br/>main branch"]
   rel["GitHub release asset<br/>vsia-demo-bundle.tar.gz"]
-  gem["Google Gemini API<br/>gemini-2.5-flash-lite, free tier"]
+  gem["Google Gemini API<br/>gemini-3.5-flash-lite, free tier"]
   groq["Groq API<br/>openai/gpt-oss-20b, free tier"]
   paid["OpenAI / Anthropic APIs<br/>visitor's own key only"]
 

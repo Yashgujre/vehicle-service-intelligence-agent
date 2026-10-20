@@ -153,7 +153,7 @@ Each subsection names the code, the decision records and the main trade-off. Run
   provider (ADR-0002). Models: `qwen2.5:3b` on Ollama, `claude-haiku-5-5` on Anthropic, `gpt-6-luna` on
   OpenAI, both hosted models priced at $0.10 input and $0.50 output per million tokens in
   `config/settings.yaml` (ADR-0006). Temperature 0, at most 700 output tokens.
-- For the hosted demo, `gemini-2.5-flash-lite` on Google Gemini and `openai/gpt-oss-20b` on Groq, both on
+- For the hosted demo, `gemini-3.5-flash-lite` on Google Gemini and `openai/gpt-oss-20b` on Groq, both on
   free tiers (price 0), go through one OpenAI-compatible caller (`_chat_completions`) with a strict,
   self-contained schema. `LLMError.status` carries the provider's HTTP status so callers can tell a 429
   from other failures. `use_keys()` supplies a visitor's own key for one request without storing or

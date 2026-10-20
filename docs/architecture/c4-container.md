@@ -102,7 +102,7 @@ External systems used only by the hosted demo:
 
 | Name | Responsibility | Technology | ADR |
 |---|---|---|---|
-| Google Gemini API | Primary model for triage and chat on the owner's free key, or a visitor's key | `gemini-2.5-flash-lite` through the OpenAI-compatible Chat Completions endpoint (`vsia.llm._chat_completions`) | ADR-0088 |
+| Google Gemini API | Primary model for triage and chat on the owner's free key, or a visitor's key | `gemini-3.5-flash-lite` through the OpenAI-compatible Chat Completions endpoint (`vsia.llm._chat_completions`) | ADR-0088 |
 | Groq API | Backup when Gemini answers 429 on the triage page, or a visitor's key | `openai/gpt-oss-20b`, same OpenAI-compatible caller | ADR-0088 |
 | GitHub release asset | Holds the checksummed, redacted demo data bundle the app downloads on first start | `tar.gz` built by `scripts/build_demo_bundle.py` | ADR-0091 |
 | Streamlit Community Cloud | Runs the dashboard container, deploys from the GitHub repository, holds the secrets | Free Community Cloud app | ADR-0089 |

@@ -110,10 +110,10 @@ llm:
     # Free tiers used by the hosted demo (ADR-0088). Prices are 0 on the free tier; the paid-tier list
     # price is kept for the cost model in docs/operations/cost-model.md.
     gemini:
-      model: gemini-2.5-flash-lite
+      model: gemini-3.5-flash-lite
       base_url: https://generativelanguage.googleapis.com/v1beta/openai
       price_per_mtok: {input: 0.0, output: 0.0}
-      paid_price_per_mtok: {input: 0.10, output: 0.40}
+      paid_price_per_mtok: {input: 0.30, output: 2.50}
     groq:
       model: openai/gpt-oss-20b
       base_url: https://api.groq.com/openai/v1
