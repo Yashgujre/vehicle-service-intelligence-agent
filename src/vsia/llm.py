@@ -61,6 +61,20 @@ def use_keys(keys: dict[str, str]) -> Iterator[None]:
         _key_override.reset(token)
 
 
+_fail_fast: ContextVar[bool] = ContextVar("vsia_llm_fail_fast", default=False)
+
+
+@contextmanager
+def fail_fast(enabled: bool = True) -> Iterator[None]:
+    """Inside the block, provider errors are raised at once instead of retried and requests time out sooner, for
+    callers that have another model to fall back to."""
+    token = _fail_fast.set(enabled)
+    try:
+        yield
+    finally:
+        _fail_fast.reset(token)
+
+
 def api_key(provider: str) -> str | None:
     if provider in _key_override.get():
         return _key_override.get()[provider]
@@ -130,8 +144,11 @@ def inline_refs(schema: dict) -> dict:
 
 
 def _retryable(exc: BaseException) -> bool:
+    if _fail_fast.get():
+        return False
     if isinstance(exc, httpx.HTTPStatusError):
-        return exc.response.status_code in (408, 409, 429) or exc.response.status_code >= 500
+        code = exc.response.status_code
+        return code in (408, 409, 429) or code >= 500
     return isinstance(exc, (httpx.TransportError,))
 
 
@@ -199,7 +216,7 @@ def _chat_completions(provider: str):
         if not key:
             raise LLMError(f"{KEY_ENV[provider].upper()} is not set")
         pcfg = config.settings()["llm"]["providers"][provider]
-        r = httpx.post(f"{pcfg['base_url'].rstrip('/')}/chat/completions", timeout=120.0,
+        r = httpx.post(f"{pcfg['base_url'].rstrip('/')}/chat/completions", timeout=30.0 if _fail_fast.get() else 120.0,
                        headers={"Authorization": f"Bearer {key}"},
                        json={"model": model, "max_tokens": max_tokens, "temperature": temperature,
                              "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],

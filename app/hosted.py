@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 import httpx
 import streamlit as st
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from vsia import bundle, config, db, llm
 
@@ -101,11 +102,15 @@ def _bundle_installed_utc() -> datetime | None:
         return None
 
 
-def hosted_calls_today(provider: str) -> int:
-    """Calls since midnight Pacific, ignoring calls made locally before the bundle was built and installed."""
+def hosted_calls_today(provider: str, model: str | None = None) -> int:
+    """Calls since midnight Pacific that used quota, ignoring calls made locally before the bundle was built and
+    installed. Rate-limited calls (HTTP 429) do not use quota."""
     since = max(filter(None, [_pacific_midnight_utc(), _bundle_installed_utc()]))
     c = db.llm_calls.c
-    q = select(func.count()).select_from(db.llm_calls).where(c.provider == provider, c.created_at >= since)
+    q = select(func.count()).select_from(db.llm_calls).where(
+        c.provider == provider, c.created_at >= since, or_(c.ok.is_(True), c.error.is_(None), ~c.error.contains("429")))
+    if model:
+        q = q.where(c.model == model)
     try:
         with db.engine().connect() as conn:
             return int(conn.execute(q).scalar_one())
@@ -122,7 +127,7 @@ def quota_block(choice: ModelChoice, calls_needed: int = 1) -> str | None:
         return (f"This session has used its {SESSION_AI_RUNS} free AI calls on the shared key. Paste your own free "
                 "key in the sidebar, or switch to the offline classifier.")
     cap = config.env().vsia_hosted_daily_llm_calls
-    if hosted_calls_today(choice.provider) + calls_needed > cap:
+    if hosted_calls_today(choice.provider, choice.model) + calls_needed > cap:
         return ("The shared free key has reached today's limit. Paste your own free key in the sidebar, or switch "
                 "to the offline classifier. The limit resets at midnight Pacific time.")
     return None
@@ -131,6 +136,47 @@ def quota_block(choice: ModelChoice, calls_needed: int = 1) -> str | None:
 def count_ai_calls(choice: ModelChoice, n: int) -> None:
     if choice.source == "hosted":
         st.session_state["ai_runs"] = st.session_state.get("ai_runs", 0) + n
+
+
+# Shared by every session in this server process: a model that just failed is skipped for a while, so visitors
+# do not each wait on a model whose daily quota is spent or that is overloaded.
+_RATE_LIMITED: dict[tuple[str, str], float] = {}
+RATE_LIMIT_SKIP_S = 600
+OVERLOAD_SKIP_S = 120
+_TRANSPORT_ERRORS = ("Timeout", "ConnectError", "RemoteProtocolError", "ReadError")
+
+
+def unavailable(status: int | None, error: str | None) -> bool:
+    """The provider refused or could not serve the call (rate limit, overload, no response): the next model in
+    the chain may succeed. Invalid output and other errors are not retried on another model."""
+    return status == 429 or (status or 0) >= 500 or any(s in str(error or "") for s in _TRANSPORT_ERRORS)
+
+
+def mark_unavailable(choice: ModelChoice, status: int | None) -> None:
+    if choice.source == "hosted":
+        skip = RATE_LIMIT_SKIP_S if status == 429 else OVERLOAD_SKIP_S
+        _RATE_LIMITED[(choice.provider, choice.model)] = time.monotonic() + skip
+
+
+def candidates(choice: ModelChoice, calls_needed: int = 1) -> tuple[list[ModelChoice], str | None]:
+    """Models to try in order for this request, and the reason to refuse if there are none. On the host's key:
+    the chosen model, then the provider's backup models (separate free-tier quotas), then Groq if its key is set.
+    Visitor keys and local or offline models are used as chosen."""
+    if choice.source != "hosted":
+        return [choice], None
+    if block := quota_block(choice, calls_needed):
+        if "this session" in block:
+            return [], block
+    chain = [choice] + [ModelChoice(provider=choice.provider, model=m, source="hosted")
+                        for m in config.settings()["llm"]["providers"][choice.provider].get("backup_models", [])]
+    if choice.provider != "groq" and llm.api_key("groq"):
+        chain.append(ModelChoice(provider="groq", model=config.llm_model("groq"), source="hosted"))
+    now = time.monotonic()
+    usable = [c for c in chain if not quota_block(c, calls_needed)]
+    fresh = [c for c in usable if _RATE_LIMITED.get((c.provider, c.model), 0) <= now]
+    if not usable:
+        return [], quota_block(choice, calls_needed)
+    return fresh or usable[-1:], None
 
 
 def model_picker() -> ModelChoice:

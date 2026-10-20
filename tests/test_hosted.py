@@ -233,6 +233,69 @@ def test_daily_cap_ignores_calls_shipped_inside_the_bundle(hosted_mod, monkeypat
     assert hosted.quota_block(shared) is None
 
 
+def test_candidates_move_to_backup_models_on_cap_or_rate_limit(hosted_mod, monkeypatch):
+    from datetime import datetime
+
+    from sqlalchemy import insert
+
+    from vsia import db
+
+    hosted, session = hosted_mod
+    monkeypatch.setattr(hosted, "_bundle_installed_utc", lambda: None)
+    monkeypatch.setattr(hosted, "_RATE_LIMITED", {})
+    main = config.llm_model("gemini")
+    backups = config.settings()["llm"]["providers"]["gemini"]["backup_models"]
+    shared = hosted.ModelChoice(provider="gemini", model=main, source="hosted")
+
+    chain, block = hosted.candidates(shared)
+    assert block is None and [c.model for c in chain] == [main, *backups]
+
+    hosted.mark_unavailable(shared, 429)
+    chain, _ = hosted.candidates(shared)
+    assert [c.model for c in chain] == backups
+
+    monkeypatch.setattr(hosted, "_RATE_LIMITED", {})
+    with db.engine().begin() as conn:
+        conn.execute(insert(db.llm_calls), [{"provider": "gemini", "model": main, "purpose": "triage", "ok": True,
+                                             "created_at": datetime.utcnow()}
+                                            for _ in range(config.env().vsia_hosted_daily_llm_calls)])
+        conn.execute(insert(db.llm_calls), [{"provider": "gemini", "model": backups[0], "purpose": "triage",
+                                             "ok": False, "error": "HTTP 429 Too Many Requests",
+                                             "created_at": datetime.utcnow()} for _ in range(5)])
+    assert hosted.hosted_calls_today("gemini", backups[0]) == 0
+    chain, _ = hosted.candidates(shared)
+    assert [c.model for c in chain] == backups
+
+    session["ai_runs"] = hosted.SESSION_AI_RUNS
+    chain, block = hosted.candidates(shared)
+    assert chain == [] and "this session" in block.lower()
+    own = hosted.ModelChoice(provider="gemini", model=main, source="own", keys={"gemini": "k"})
+    assert hosted.candidates(own) == ([own], None)
+
+
+def test_unavailable_covers_rate_limits_overload_and_timeouts_only(hosted_mod):
+    hosted, _ = hosted_mod
+    assert hosted.unavailable(429, None) and hosted.unavailable(503, None)
+    assert hosted.unavailable(None, "ReadTimeout: timed out")
+    assert not hosted.unavailable(None, "invalid output (attempt 2): JSONDecodeError at position 3")
+    assert not hosted.unavailable(400, "HTTPStatusError: 400 Bad Request")
+
+
+def test_fail_fast_raises_overload_without_retrying(clean_env, monkeypatch):
+    clean_env.setenv("GEMINI_API_KEY", "k")
+    config.env.cache_clear()
+    calls = []
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        calls.append(timeout)
+        return httpx.Response(503, json={"error": "busy"}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(llm.httpx, "post", fake_post)
+    with llm.fail_fast(), pytest.raises(llm.LLMError) as e:
+        llm.complete_json("s", "u", TriageOutput, purpose="test", provider="gemini")
+    assert e.value.status == 503 and calls == [30.0]
+
+
 def test_quota_hit_reads_status_or_error_text(hosted_mod):
     hosted, _ = hosted_mod
     assert hosted.quota_hit({"llm_status": 429})

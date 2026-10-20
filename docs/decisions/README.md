@@ -115,6 +115,7 @@ Rules:
 | [0090](0090-in-process-onnx-embedder-for-the-hosted-demo.md) | Embed queries in-process with the same nomic model (ONNX), not a hosted embedding API | retrieval | Accepted |
 | [0091](0091-demo-data-bundle-as-release-asset.md) | Ship the demo data as a checksummed release asset, not in Git | hosted demo, data | Accepted |
 | [0092](0092-quota-guard-and-visitor-key-handling.md) | Cap shared free-tier use per session and per day; keep visitor keys in the session only | hosted demo, security | Accepted |
+| [0093](0093-backup-model-chain-for-the-shared-key.md) | Fall through a chain of free models on the shared key, failing fast between them | hosted demo, LLM gateway | Accepted |
 
 ## Notes
 

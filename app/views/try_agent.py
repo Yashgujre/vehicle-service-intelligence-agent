@@ -120,24 +120,24 @@ with tab_write:
             st.warning("Write a complaint first, or click one of the examples.")
 
 if run and complaint is not None:
-    if choice.uses_ai and (block := hosted.quota_block(choice)):
+    chain, block = hosted.candidates(choice) if choice.uses_ai else ([choice], None)
+    if block:
         st.warning(block)
         st.stop()
     run_id = f"playground-{st.session_state['session_tag']}"
     with st.spinner(f"Running the agent with {choice.label}..."):
-        with llm.use_keys(choice.keys):
-            rec = agent.triage(complaint, provider=choice.provider, model=choice.model, run_id=run_id,
-                               persist=persist, enqueue=persist)
-        hosted.count_ai_calls(choice, 1 if choice.uses_ai else 0)
-        fell_back = None
-        if hosted.quota_hit(rec.confidence_signals) and choice.source == "hosted" and llm.api_key("groq") \
-                and choice.provider != "groq":
-            backup = hosted.ModelChoice(provider="groq", model=config.llm_model("groq"), source="hosted")
-            if not hosted.quota_block(backup):
-                rec = agent.triage(complaint, provider="groq", model=backup.model, run_id=run_id,
-                                   persist=persist, enqueue=persist)
-                hosted.count_ai_calls(backup, 1)
-                fell_back = backup.label
+        for n, used in enumerate(chain, 1):
+            with llm.use_keys(used.keys), llm.fail_fast(n < len(chain)):
+                rec = agent.triage(complaint, provider=used.provider, model=used.model, run_id=run_id,
+                                   persist=False, enqueue=False)
+            down = hosted.unavailable(rec.confidence_signals.get("llm_status"), rec.confidence_signals.get("llm_error"))
+            if not down:
+                hosted.count_ai_calls(used, 1 if used.uses_ai else 0)
+                break
+            hosted.mark_unavailable(used, rec.confidence_signals.get("llm_status"))
+        if persist:
+            agent.save(rec, run_id=run_id, enqueue=True)
+        fell_back = used.label if used.model != choice.model and not down else None
     st.session_state["last_run"] = {"rec": rec, "truth": truth, "text": complaint.summary, "crash": complaint.crash,
                                     "fire": complaint.fire, "persist": persist, "fell_back": fell_back,
                                     "choice": choice.label}
@@ -150,12 +150,19 @@ rec, sig = res["rec"], res["rec"].confidence_signals
 out = rec.output
 st.divider()
 if res["fell_back"]:
-    st.info(f"The shared Gemini quota was exhausted, so this run used the free backup model {res['fell_back']}.")
+    st.info(f"The main model is rate limited or overloaded right now, so this run used the free backup model "
+            f"{res['fell_back']}."
+            + (" Its confidence uses the calibration fitted on the main model." if rec.provider == "gemini" else ""))
 elif sig.get("llm_error"):
     if hosted.quota_hit(sig):
         st.warning("The AI provider refused the call because a free-tier rate limit was hit. The agent fell back "
                    "to the offline classifier and sent the case to human review, which is the designed failure "
-                   "mode. Wait a minute, or paste your own free key in the sidebar.")
+                   "mode. A per-minute limit clears within a minute; the daily limit resets at midnight Pacific "
+                   "time. Your own free key in the sidebar works right away.")
+    elif hosted.unavailable(sig.get("llm_status"), sig.get("llm_error")):
+        st.warning("The free AI models are overloaded right now, so the agent fell back to the offline classifier "
+                   "and sent the case to human review, which is the designed failure mode. Try again in a minute, "
+                   "or paste your own free key in the sidebar.")
     else:
         st.warning("The AI call failed, so the agent fell back to the offline classifier and routed the case to "
                    f"human review (the designed failure mode). Error: {sig['llm_error'][:200]}")

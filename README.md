@@ -109,7 +109,7 @@ Full map, grouped by the question each document answers: [docs/README.md](docs/R
 |---|---|
 | Design | [design doc](docs/design/design-doc.md) |
 | Architecture | [C4 context](docs/architecture/c4-context.md), [containers](docs/architecture/c4-container.md), [triage components](docs/architecture/c4-component-triage.md), [sequences](docs/architecture/sequences.md), [data flow](docs/architecture/data-flow.md), [deployment](docs/architecture/deployment.md), [dashboard](docs/architecture/dashboard.md) |
-| Decisions | [59 architecture decision records](docs/decisions/README.md) with options, trade-offs and revisit triggers |
+| Decisions | [60 architecture decision records](docs/decisions/README.md) with options, trade-offs and revisit triggers |
 | Data | [lineage](docs/data/lineage.md), [data dictionary](docs/data/data-dictionary.md), datasheets for the [corpus](docs/data/datasheet-nhtsa-corpus.md) and the [gold set](docs/data/datasheet-gold-set.md) |
 | LLM | [tools](docs/llm/tools.md), prompts for [triage](docs/llm/prompts/triage.md), [RAG](docs/llm/prompts/rag.md), [recall extraction](docs/llm/prompts/recall-extraction.md) |
 | Security and AI risk | [threat model (STRIDE)](docs/security/threat-model.md), [data-flow diagram](docs/security/data-flow-diagram.md), [AI risk register](docs/security/ai-risk-register.md), [guardrails](docs/security/guardrails.md), [PII handling](docs/security/pii-handling.md) |

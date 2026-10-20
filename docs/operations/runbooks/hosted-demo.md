@@ -87,4 +87,5 @@ The download URL is
 | Triage shows "free-tier rate limit was hit" | 15 requests per minute exceeded | Transient; wait a minute |
 | "This app has gone over its resource limits" | Memory ceiling | Reboot from Manage app; see ADR-0089 revisit trigger |
 | Warning "demo dataset could not be installed" and snapshot pages only | Bundle download failed, `VSIA_BUNDLE_SHA256` missing, or "bundle checksum mismatch" (secret and release asset disagree); the cause is in the warning | Fix the secret or re-copy the sha256 from the build output, then reboot (the install is tried once per process) |
+| `TypeError` or `AttributeError` from `vsia` right after a push | Community Cloud hot-reloads files under `app/` but keeps already-imported `src/vsia` modules, so new app code calls old library code | Reboot from Manage app after any push that changes `src/` |
 | Ask page slow on first question | Embedding model download after a cold start (ADR-0090) | Expected once per start |

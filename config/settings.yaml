@@ -111,6 +111,9 @@ llm:
     # price is kept for the cost model in docs/operations/cost-model.md.
     gemini:
       model: gemini-3.5-flash-lite
+      # Free-tier quotas are per model, so the hosted demo moves to these when the main model is
+      # rate limited or at its daily cap (ADR-0093).
+      backup_models: [gemini-3.1-flash-lite]
       base_url: https://generativelanguage.googleapis.com/v1beta/openai
       price_per_mtok: {input: 0.0, output: 0.0}
       paid_price_per_mtok: {input: 0.30, output: 2.50}

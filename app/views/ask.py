@@ -81,14 +81,27 @@ if question:
             with st.spinner("Searching..."):
                 res = _sources_only(question)
             content = res["answer"]
-        elif block := hosted.quota_block(choice, calls_needed=2):
-            content = block
         else:
-            try:
-                with st.spinner(f"Planning, retrieving and answering with {choice.label}..."):
-                    with llm.use_keys(choice.keys):
-                        res = rag.answer(question, provider=choice.provider)
-                hosted.count_ai_calls(choice, 2)
+            chain, block = hosted.candidates(choice, calls_needed=2)
+            content = block or ""
+            for n, used in enumerate(chain, 1):
+                try:
+                    with st.spinner(f"Planning, retrieving and answering with {used.label}..."):
+                        with llm.use_keys(used.keys), llm.fail_fast(n < len(chain)):
+                            res = rag.answer(question, provider=used.provider, model=used.model)
+                except llm.LLMError as e:
+                    if hosted.unavailable(e.status, str(e)):
+                        hosted.mark_unavailable(used, e.status)
+                        content = ("The free-tier rate limit was hit. A per-minute limit clears within a minute; the "
+                                   "daily limit resets at midnight Pacific time. Your own free key in the sidebar "
+                                   "works right away." if e.status == 429 else
+                                   "The free AI models are overloaded right now. Try again in a minute, or paste "
+                                   "your own free key in the sidebar.")
+                        continue
+                    hosted.count_ai_calls(used, 1)
+                    content = f"The AI call failed: {str(e)[:200]}"
+                    break
+                hosted.count_ai_calls(used, 2)
                 content = _linkify(res["answer"])
                 if res.get("refused"):
                     content += "\n\n_Refused: the question is outside this dataset or the sources do not answer it._"
@@ -97,11 +110,10 @@ if question:
                 caption = (f"Intent: {plan.get('intent', 'n/a')}"
                            + (f"; filters: {filters}" if filters else "")
                            + f"; {len(res.get('citations', []))} verified citation(s); "
-                           f"{res.get('latency_ms', 0):,} ms; {choice.label}.")
-            except llm.LLMError as e:
-                hosted.count_ai_calls(choice, 1)
-                content = ("The free-tier rate limit was hit. Wait a minute, or paste your own free key in the sidebar."
-                           if e.status == 429 else f"The AI call failed: {str(e)[:200]}")
+                           f"{res.get('latency_ms', 0):,} ms; {used.label}"
+                           + (" (backup model; the main model is rate limited or overloaded right now)."
+                              if used.model != choice.model else "."))
+                break
         st.markdown(content)
         if caption:
             st.caption(caption)
