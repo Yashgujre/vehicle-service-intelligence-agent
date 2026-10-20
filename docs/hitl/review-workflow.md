@@ -10,9 +10,9 @@ ADR-0062 (severity business rule), ADR-0063 (recall grounding), ADR-0064 (evalua
 ADR-0073 (review UI inside the dashboard), ADR-0040 (silver labels), ADR-0043 (baseline classifier as a
 confidence signal). Runbook: [review backlog](../operations/runbooks/review-backlog.md).
 
-Measured values (calibrator coefficients, the tuned threshold, coverage and auto-route accuracy) do not
-exist yet. They are written to `data/models/routing_<provider>.json` by
-`python -m eval.run_eval calibrate` and reported in `docs/evaluation/reports/` (pending).
+Measured values (calibrator coefficients, the tuned threshold, coverage and auto-route accuracy) are written
+to `data/models/routing_<provider>.json` by `python -m eval.run_eval calibrate`; gold-split results are in
+`docs/evaluation/reports/` and [model-comparison.md](../evaluation/model-comparison.md).
 
 ## 1. Where review sits in the triage workflow
 
@@ -125,7 +125,15 @@ calibration-split coverage and accuracy are optimistic. The gold-split metrics `
 `auto_route_accuracy_any_label` (see [metrics](../evaluation/metrics.md)) are the out-of-sample check,
 and the random audit below is the production check.
 
-Selected values per provider: measured in `data/models/routing_<provider>.json` (pending).
+Selected values per provider, fitted on the 300-complaint calibration split (`data/models/routing_<provider>.json`):
+
+| Provider | Threshold | Calibration: auto-routed | Calibration: accuracy | Gold: auto-routed | Gold: accuracy |
+|---|---|---|---|---|---|
+| `heuristic` (TF-IDF) | 0.825 | 19.3% | 0.914 | 19.0% | 0.895 |
+| `ollama` (`qwen2.5:3b`) | 0.775 | 28.3% | 0.906 | 27.5% | 0.964 |
+| `gemini` (`gemini-3.5-flash-lite`) | 0.775 | 49.0% | 0.905 | 44.0% | 0.875 |
+
+Groq has no calibrator yet; it uses the default threshold 0.70 from `config/settings.yaml`.
 
 ## 5. Random audit sampling (recommended, not implemented)
 

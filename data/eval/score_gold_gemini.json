@@ -1,0 +1,125 @@
+{
+ "provider": "gemini",
+ "model": "gemini-3.5-flash-lite",
+ "split": "gold",
+ "prompt_version": "triage-v1",
+ "metrics": {
+  "n": 200,
+  "component_accuracy_primary": 0.535,
+  "component_accuracy_any_label": 0.7,
+  "component_macro_f1_primary": 0.5500828601894846,
+  "field_accuracy_make": 1.0,
+  "field_accuracy_model": 0.995,
+  "field_accuracy_model_year": 1.0,
+  "severity_exact_vs_silver": 0.44,
+  "severity_within_one_vs_silver": 0.895,
+  "s1_precision_llm_raw": 0.45454545454545453,
+  "s1_recall_llm_raw": 0.8,
+  "auto_route_rate": 0.44,
+  "auto_route_accuracy_any_label": 0.875,
+  "threshold": 0.775,
+  "recall_at_5_retrieval_silver": 0.8133333333333334,
+  "recall_match_hit_rate_llm_silver": 0.49333333333333335,
+  "n_with_known_recall": 75,
+  "llm_recall_match_precision_silver": 0.5164835164835165,
+  "llm_failure_rate": 0.0,
+  "latency_median_s": 1.486,
+  "latency_p95_s": 4.244899999999999,
+  "cost_per_1000_usd": 0.0
+ },
+ "per_class_any_label_accuracy": {
+  "FORWARD COLLISION AVOIDANCE": {
+   "n": 20,
+   "acc": 0.9
+  },
+  "OTHER": {
+   "n": 20,
+   "acc": 0.0
+  },
+  "ELECTRICAL SYSTEM": {
+   "n": 20,
+   "acc": 0.9
+  },
+  "POWER TRAIN": {
+   "n": 20,
+   "acc": 0.7
+  },
+  "VEHICLE SPEED CONTROL": {
+   "n": 17,
+   "acc": 0.9411764705882353
+  },
+  "SERVICE BRAKES": {
+   "n": 16,
+   "acc": 0.75
+  },
+  "STEERING": {
+   "n": 16,
+   "acc": 0.9375
+  },
+  "VISIBILITY/WIPER": {
+   "n": 11,
+   "acc": 0.6363636363636364
+  },
+  "SUSPENSION": {
+   "n": 7,
+   "acc": 0.5714285714285714
+  },
+  "STRUCTURE": {
+   "n": 7,
+   "acc": 0.7142857142857143
+  },
+  "AIR BAGS": {
+   "n": 6,
+   "acc": 0.6666666666666666
+  },
+  "ENGINE": {
+   "n": 5,
+   "acc": 0.8
+  },
+  "EXTERIOR LIGHTING": {
+   "n": 5,
+   "acc": 1.0
+  },
+  "LANE DEPARTURE": {
+   "n": 4,
+   "acc": 0.0
+  },
+  "FUEL/PROPULSION SYSTEM": {
+   "n": 4,
+   "acc": 0.25
+  },
+  "PARKING BRAKE": {
+   "n": 3,
+   "acc": 0.6666666666666666
+  },
+  "SEAT BELTS": {
+   "n": 3,
+   "acc": 1.0
+  },
+  "SEATS": {
+   "n": 3,
+   "acc": 1.0
+  },
+  "TIRES": {
+   "n": 3,
+   "acc": 1.0
+  },
+  "WHEELS": {
+   "n": 3,
+   "acc": 0.6666666666666666
+  },
+  "LATCHES/LOCKS/LINKAGES": {
+   "n": 3,
+   "acc": 0.6666666666666666
+  },
+  "BACK OVER PREVENTION": {
+   "n": 3,
+   "acc": 0.6666666666666666
+  },
+  "HYBRID PROPULSION SYSTEM": {
+   "n": 1,
+   "acc": 0.0
+  }
+ },
+ "mlflow_run_id": "d18f37adecda431695cb2744c2eaac9f"
+}

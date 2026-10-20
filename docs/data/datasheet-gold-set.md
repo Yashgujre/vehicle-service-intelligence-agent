@@ -200,9 +200,10 @@ complaint from the database and triages it without them (ADR-0005).
   auto-routed accuracy reaches the 0.90 target, written to `routing_<provider>.json` (ADR-0061).
 - Train: the TF-IDF baseline classifier.
 
-**Results.** Triage agent results: measured in docs/evaluation/ (pending); no triage evaluation has been
-run on this database (`eval_runs` is empty, `data/eval/` does not exist, and no calibrator or routing file
-is in `data/models/`). The baseline classifier, trained on the train split and scored on gold, is reported
+**Results.** Triage results for the offline classifier, local `qwen2.5:3b` and Gemini
+`gemini-3.5-flash-lite` on all 200 gold rows, with calibrators fitted on the 300 calibration rows, are in
+[model-comparison.md](../evaluation/model-comparison.md) and `docs/evaluation/reports/`. The baseline
+classifier, trained on the train split and scored on gold, is reported
 in [docs/evaluation/baseline-classifier.md](../evaluation/baseline-classifier.md) (generated
 2026-10-19T18:20:28Z); read those numbers as agreement with silver labels.
 

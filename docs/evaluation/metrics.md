@@ -9,7 +9,7 @@ Plan, datasets, thresholds and regression policy: [eval-plan.md](eval-plan.md). 
 (WAPE, MASE, interval coverage) are defined in [the backtest report](../models/backtest-report.md).
 
 No values appear in this file. Values are measured in `docs/evaluation/reports/<date>-<provider>-gold.md`
-and `docs/evaluation/model-comparison.md` (pending).
+and `docs/evaluation/model-comparison.md`.
 
 ## Notation
 
@@ -113,7 +113,7 @@ accuracy, macro-F1 and weighted-F1 over the classes present in gold, population-
 (per-class recall weighted by the corpus class share, ADR-0041), slices (S1 flags, with known recall,
 multi-label, single-label), top-label expected calibration error over 10 equal-width bins, a reliability
 table and a coverage curve over thresholds 0.30 to 0.90. Values: measured in
-`docs/evaluation/baseline-classifier.md` (pending).
+`docs/evaluation/baseline-classifier.md`.
 
 ## Statistical reading
 

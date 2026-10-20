@@ -4,10 +4,12 @@ What "good enough to ship" means for the triage agent, which data it is measured
 measuring, and what blocks a change. Metric formulas are in [metrics.md](metrics.md). The forecaster has
 its own evaluation in [the backtest report](../models/backtest-report.md).
 
-Status on 2026-10-19: the gold, calibration and train splits are built
-(`data/gold/build_summary.json`, built 2026-10-19T05:45:25Z). No triage evaluation has run: `eval_runs` is
-empty and `data/eval/` does not exist. Every result cell in this plan is therefore "measured in
-`<path>` (pending)".
+Status on 2026-10-20: the gold, calibration and train splits are built
+(`data/gold/build_summary.json`, built 2026-10-19T05:45:25Z). Three providers have been evaluated on all
+200 gold rows with calibrators fitted on the calibration split: the offline classifier (`heuristic`),
+local `qwen2.5:3b` (`ollama`) and `gemini-3.5-flash-lite` (`gemini`). Results are in
+[model-comparison.md](model-comparison.md) and `reports/`. Cells below that still say "(pending)" refer
+to providers or checks not yet run.
 
 ## 1. Objectives
 
@@ -104,8 +106,8 @@ exists.
 
 | Metric | Proposed threshold | Basis |
 |---|---|---|
-| `component_accuracy_any_label` (gold) | at least the baseline classifier's any-label accuracy on the same rows | An LLM that does not beat TF-IDF is not worth its cost. Baseline measured in `docs/evaluation/baseline-classifier.md` (pending) |
-| `auto_route_accuracy_any_label` (gold) | at least 0.85 | Calibration target is 0.90 (ADR-0061); 5 points allowed for gold being out of sample and class-capped |
+| `component_accuracy_any_label` (gold) | at least the baseline classifier's any-label accuracy on the same rows | An LLM that does not beat TF-IDF is not worth its cost. Baseline measured in `docs/evaluation/baseline-classifier.md`: 0.680 on gold. Gemini 0.700 passes; `qwen2.5:3b` 0.520 fails |
+| `auto_route_accuracy_any_label` (gold) | at least 0.85 | Calibration target is 0.90 (ADR-0061); 5 points allowed for gold being out of sample and class-capped. Gemini 0.875 and `qwen2.5:3b` 0.964 pass |
 | `auto_route_rate` (gold) | report only; must be above 0 | A threshold that auto-routes nothing has given up, not succeeded |
 | `s1_recall_llm_raw` (gold) | at least 0.80 | The rule catches flagged S1s anyway; this protects unflagged critical narratives. n = 25, so 0.80 means at most 5 misses |
 | `recall_match_hit_rate_llm_silver` (gold) | at least `recall_at_5_retrieval_silver` minus 0.10 | The model should not lose most of what retrieval found |

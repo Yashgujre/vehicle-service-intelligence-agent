@@ -49,16 +49,16 @@ multi-user product, and fine-tuning models.
 |---|---|---|---|
 | G1 | Daily, idempotent ingestion of complaints and recalls with run logging (FR-1) | Re-runs insert nothing new | Met: a re-run inserted 0 rows and skipped 13,367 duplicates (ADR-0004) |
 | G2 | Parse recall PDFs to validated structured fields (FR-2) | At least 95% valid JSON | 88 of 150 documents carry a valid extraction; all 80 Part 573 reports are valid and 62 owner letters are covered by their campaign's Part 573 (ADR-0032). Whether "covered" counts toward FR-2 is an open question |
-| G3 | Hybrid retrieval over recalls, recall documents and complaints (FR-3) | Top-5 in under 1 s; recall@5 at least 80% | Index built for recalls (407) and recall_docs (352) (ADR-0030, ADR-0033); latency and recall@5 measured in docs/evaluation/ (pending) |
-| G4 | Triage each complaint into extracted fields, component, severity and recall matches with citations (FR-4) | Component accuracy at least 85% | Measured in docs/evaluation/ (pending) |
-| G5 | Route uncertain triage to a human and turn the decision into a label (FR-5) | At least 70% auto-routed | Measured in docs/evaluation/ (pending) |
+| G3 | Hybrid retrieval over recalls, recall documents and complaints (FR-3) | Top-5 in under 1 s; recall@5 at least 80% | Index built for recalls (407) and recall_docs (352) (ADR-0030, ADR-0033); recall@5 0.813 on the 75 gold complaints with a known recall ([model comparison](../evaluation/model-comparison.md)); latency not yet measured separately |
+| G4 | Triage each complaint into extracted fields, component, severity and recall matches with citations (FR-4) | Component accuracy at least 85% | Not met: on silver labels, primary accuracy 0.535 for Gemini, 0.405 for `qwen2.5:3b` and 0.555 for the TF-IDF baseline; any-label 0.700, 0.520 and 0.680 ([model comparison](../evaluation/model-comparison.md)) |
+| G5 | Route uncertain triage to a human and turn the decision into a label (FR-5) | At least 70% auto-routed | Not met: at about 0.90 accuracy the calibrated router auto-routes 44% (Gemini), 27.5% (`qwen2.5:3b`) and 19% (baseline) of gold complaints ([review workflow](../hitl/review-workflow.md)) |
 | G6 | Switch LLM provider by configuration (FR-6) | Same code, any provider | Implemented for Ollama, Anthropic, OpenAI, Gemini, Groq and a no-LLM heuristic (ADR-0002, ADR-0088) |
 | G7 | Weekly per-component forecast and spike alerts (FR-7) | Beat seasonal naive | Met on the backtest holdout: champion `glm_poisson` (`vsia-complaint-forecaster` v1) has 1-step WAPE 50.33 against 65.95 for the seasonal naive, a ratio of 0.763 ([backtest report](../models/backtest-report.md)) |
 | G8 | Dashboard (FR-8) | Pages load in under 5 s | Cold load 1.6 s, warm 0.25 to 0.56 s on the demo snapshot (ADR-0074) |
 | G9 | Chat over the corpus with citations (FR-9) | Grounded answers, refusals out of scope | Implemented (ADR-0065); quality measured in docs/evaluation/ (pending) |
 | G10 | Infrastructure as code (FR-10) | One-command VM | Terraform, cloud-init and Compose defined (ADR-0080 to ADR-0087) |
 | G11 | Guardrails (FR-11) | PII redaction, injection defence, grounded citations | Implemented in `vsia.guardrails`; 18 unit tests |
-| G12 | Evaluation harness (FR-12) | Reproducible metrics per provider | Implemented in `eval/run_eval.py`; triage results measured in docs/evaluation/ (pending). Cost target under $1 per 1,000 complaints: measured in docs/evaluation/ (pending) |
+| G12 | Evaluation harness (FR-12) | Reproducible metrics per provider | Met: `eval/run_eval.py` scored three providers on the same 200 gold complaints ([model comparison](../evaluation/model-comparison.md)). Cost: $0 per 1,000 on the free tiers; about $1.35 per 1,000 at Gemini paid list prices ([cost model](../operations/cost-model.md)) |
 
 ### Non-goals
 
@@ -428,7 +428,7 @@ Docker on the development laptop).
 |---|---|---|
 | 1. Laptop data foundation | Corpus ingested, documents parsed, index built | Done except the complaints namespace (in progress) |
 | 2. Baselines and labels | Silver gold set and splits; baseline classifier report | Done ([baseline-classifier.md](../evaluation/baseline-classifier.md)) |
-| 3. Offline evaluation | `predict` and `score` on gold for Ollama and one hosted provider; calibrator and threshold fitted per provider; comparison report | Not started (pending) |
+| 3. Offline evaluation | `predict` and `score` on gold for Ollama and one hosted provider; calibrator and threshold fitted per provider; comparison report | Done for the baseline, Ollama `qwen2.5:3b` and Gemini `gemini-3.5-flash-lite` ([model comparison](../evaluation/model-comparison.md)) |
 | 4. Forecast champion | Successful training run, champion registered, holdout WAPE compared with seasonal naive | Done: `glm_poisson` registered as v1 `@champion`; holdout WAPE 50.33 against 65.95 for the seasonal naive ([backtest report](../models/backtest-report.md)) |
 | 5. VM deployment | Terraform apply, Compose up, health checks green, workflows imported and activated one at a time | Defined, not exercised |
 | 6. Shadow operation | Daily workflow 01 active with notifications; review queue worked daily; SLIs collected for 28 days | Not started |

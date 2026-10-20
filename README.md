@@ -76,7 +76,8 @@ the [gold-set datasheet](docs/data/datasheet-gold-set.md)).
 | Spike alerts | 18 alerts; 6 of 18 within 28 days of a recall vs a 0.304 base rate, so alerts flag volume, not recalls | same |
 | PII | 94 matches in 75 of 10,303 complaints (0.73%), redacted before any model, index or log | [PII handling](docs/security/pii-handling.md) |
 | LLM triage, local `qwen2.5:3b`, gold split (200) | primary accuracy 0.405 (below the baseline); calibrated routing auto-routes 27.5% at 0.964 accuracy (threshold 0.775); recall citations hit a known recall in 38.7% of cases; median 33 s per complaint on a laptop | [comparison](docs/evaluation/model-comparison.md), [report](docs/evaluation/reports/2026-10-19-ollama-gold.md) |
-| LLM triage, Gemini free tier | being measured | `python -m eval.run_eval all --provider gemini` |
+| LLM triage, Gemini `gemini-3.5-flash-lite` (free tier), gold split (200) | primary accuracy 0.535 (baseline 0.555), any-label 0.700 (baseline 0.680); calibrated routing auto-routes 44% at 0.875 accuracy on gold (threshold 0.775, fitted for 0.90 on the calibration split, where it reached 0.905 at 49%); the raw model flags 80% of S1 complaints before the business rule; recall citations hit a known recall in 49.3% of cases; no failures; median 1.5 s per complaint | [comparison](docs/evaluation/model-comparison.md), [report](docs/evaluation/reports/2026-10-20-gemini-gold.md) |
+| What the numbers say | The LLMs do not beat the TF-IDF baseline on component accuracy against NHTSA's own coding. They add what the baseline cannot: raw severity judgement, recall linking with citations, field extraction, and more cases routed without review | [system card](docs/models/system-card.md) |
 
 ## Run it locally
 
@@ -124,7 +125,8 @@ Full map, grouped by the question each document answers: [docs/README.md](docs/R
 |---|---|
 | Ingestion, PDF parsing, index, triage agent, RAG chat, forecasting, dashboard, API, guardrails | Built and run end to end on the laptop; 174 automated tests pass |
 | Hosted demo path (bundle download, in-process embeddings, offline mode) | Rehearsed locally from a clean copy with no Ollama |
-| Gemini and Groq calls | Covered by tests with mocked HTTP; live calls not yet run |
+| Gemini and Groq calls | Gemini: 500 live triage calls in the evaluation, plus live runs on the hosted demo. Groq: live triage on the hosted demo; not yet evaluated or calibrated |
+| Hosted demo | Live on Streamlit Community Cloud; agent, chat, backup-model fall-through and offline fallback checked on the deployed app |
 | n8n workflows, Open WebUI, Docker Compose, Terraform for the OCI VM | Written and statically validated; not yet executed (ADR-0008) |
 | Gold labels | Silver labels from NHTSA fields; a hand-review sheet is in `data/gold/gold_set_review.csv` |
 
