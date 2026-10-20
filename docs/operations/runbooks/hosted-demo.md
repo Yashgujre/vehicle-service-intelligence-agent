@@ -78,6 +78,12 @@ The download URL is
 - **Rotate the Gemini key:** create a new key, update the secret, reboot, then delete the old key.
 - **App asleep:** Community Cloud sleeps apps after 12 hours without traffic. Any visitor can wake it with
   the button on the sleep page; it takes about a minute.
+- **Repository security:** secret scanning and push protection are on, so a commit containing a key is
+  rejected. Dependabot alerts and security updates are on, and `.github/dependabot.yml` opens one grouped
+  pip update PR a month; run the test suite before merging, then reboot the app. `master` is protected
+  against force-push and deletion (admins included); direct pushes still work.
+- **Review page writes:** the hosted Human review page is deliberately writable so visitors can try
+  approving a case. Set `VSIA_READONLY = "1"` in secrets and reboot if the queue is vandalised.
 
 ## Incidents
 

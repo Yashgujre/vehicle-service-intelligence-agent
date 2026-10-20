@@ -192,7 +192,7 @@ if res["persist"] and rec.route == "review":
 left, right = st.columns([3, 2])
 with left:
     st.markdown("**Severity reason**")
-    st.write(out.severity_reason)
+    st.markdown(ui.escape_md(out.severity_reason or ""))
     if sig.get("severity_rule_override"):
         st.caption("The owner reported a crash, fire, injury or death, so a business rule forced S1 regardless "
                    f"of the model's answer ({sig.get('llm_severity')}).")

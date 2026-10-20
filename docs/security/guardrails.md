@@ -341,6 +341,11 @@ fires or the guardrail itself errors).
 - Dashboard: complaint text and free-text model output are redacted on read (`app/data.py` `redact_obj`)
   and Markdown-escaped (`ui.escape_md` in `app/views/triage.py` and `app/views/review.py`). Tests:
   `test_triage_detail_redacts_text_and_output`, `test_pending_reviews_live_has_candidates_and_redacted_text`.
+- Hosted demo pages: "Try the agent" escapes the severity reason and recall rationales (`ui.escape_md`).
+  "Ask the data" passes the chat answer through `ui.defang_md`, which escapes link, image, HTML and code
+  syntax but keeps bold and lists; only `[recall:<id>]` citations become links, and those always point to
+  the NHTSA recall page (`data.recall_url`). Test:
+  `test_defang_md_blocks_links_and_images_but_keeps_formatting`.
 - Open WebUI pipe (`openwebui/vsia_pipe.py`): citations become links only when they match
   `recall:<campaign pattern>`; complaint citations get no link; refused answers show no sources. The
   `answer` text itself is rendered as Markdown without sanitisation. Tests: `test_answer_with_sources_and_events`,

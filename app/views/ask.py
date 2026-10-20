@@ -32,12 +32,15 @@ _CITE = re.compile(r"\[(recall|complaint):([A-Z0-9]+)\]")
 
 
 def _linkify(text: str) -> str:
-    def sub(m: re.Match) -> str:
+    out, pos = [], 0
+    for m in _CITE.finditer(text):
+        out.append(ui.defang_md(text[pos:m.start()]))
         kind, ident = m.group(1), m.group(2)
-        if kind == "recall":
-            return f"[[recall {ident}]]({data.recall_url(ident)})"
-        return f"[complaint {ident}]"
-    return _CITE.sub(sub, text)
+        out.append(f"[\\[recall {ident}\\]]({data.recall_url(ident)})" if kind == "recall"
+                   else f"\\[complaint {ident}\\]")
+        pos = m.end()
+    out.append(ui.defang_md(text[pos:]))
+    return "".join(out)
 
 
 def _sources_only(question: str) -> dict:
@@ -99,7 +102,7 @@ if question:
                                    "your own free key in the sidebar.")
                         continue
                     hosted.count_ai_calls(used, 1)
-                    content = f"The AI call failed: {str(e)[:200]}"
+                    content = f"The AI call failed: {ui.escape_md(str(e)[:200])}"
                     break
                 hosted.count_ai_calls(used, 2)
                 content = _linkify(res["answer"])

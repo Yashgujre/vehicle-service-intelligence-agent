@@ -344,3 +344,15 @@ def test_year_filter_matches_recall_documents_that_span_years():
     assert retrieval.matches_filter(doc, {"model_years": "2023"})
     assert not retrieval.matches_filter(doc, {"model_years": 2021})
     assert not retrieval.matches_filter(doc, {"model_year": 2023})
+
+
+def test_defang_md_blocks_links_and_images_but_keeps_formatting():
+    import sys
+
+    sys.path.insert(0, str(config.REPO_ROOT / "app"))
+    import ui
+
+    out = ui.defang_md("**Yes**: see [here](https://evil.example) ![x](https://evil.example/p.png) <b>")
+    assert "](" not in out.replace("\\](", "").replace("\\(", "")
+    assert "\\[here\\]" in out and "\\!\\[x\\]" in out and "\\<b\\>" in out
+    assert out.startswith("**Yes**")

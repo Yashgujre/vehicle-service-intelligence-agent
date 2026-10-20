@@ -123,7 +123,7 @@ with right:
                 line += f": {ui.escape_md(str(r.component_raw or ''))}"
             st.markdown(line)
             if r is not None and r.summary:
-                st.caption(str(r.summary)[:400])
+                st.caption(ui.escape_md(str(r.summary)[:400]))
     else:
         st.caption("No recall campaign was linked to this complaint.")
     others = [s for s in rec["cited_sources"] if not str(s).startswith("recall:")]

@@ -59,6 +59,14 @@ def escape_md(text: str) -> str:
     return _MD_SPECIAL.sub(r"\\\1", text)
 
 
+_MD_LINK = re.compile(r"([\\\[\]()!<>`])")
+
+
+def defang_md(text: str) -> str:
+    """Model output can be steered by the visitor: block links, images and code spans but keep bold and lists."""
+    return _MD_LINK.sub(r"\\\1", text)
+
+
 def style(fig: go.Figure, height: int = 360, legend: bool = True) -> go.Figure:
     """Layout only: backgrounds, font colour and grid come from the active Streamlit theme (light or dark)."""
     fig.update_layout(height=height, margin=dict(l=60, r=20, t=60, b=50), colorway=SEQUENCE, showlegend=legend,
