@@ -60,11 +60,12 @@ def predict(split: str, provider: str, limit: int | None = None, min_interval_s:
                 continue
             started = time.monotonic()
             c: Complaint = agent.load_complaint(g["odi_number"])
-            rec = agent.triage(c, provider=provider, run_id=run_id, persist=True, enqueue=False)
+            rec = agent.triage(c, provider=provider, run_id=run_id, persist=False, enqueue=False)
             if rec.confidence_signals.get("llm_status") == 429:
                 log.warning("rate limited at %s/%s %s %s; stopping, rerun to resume", i + 1, len(rows), split,
                             provider)
                 raise SystemExit(3)
+            agent.save(rec, run_id=run_id, enqueue=False)
             f.write(json.dumps({"odi_number": g["odi_number"], "record": rec.model_dump(mode="json")}) + "\n")
             f.flush()
             if (i + 1) % 10 == 0:

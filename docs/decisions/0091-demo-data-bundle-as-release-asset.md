@@ -22,9 +22,11 @@ would take many minutes and depend on NHTSA uptime.
 - the recalls, recall_docs and complaints index namespaces;
 - the classifier and every `routing_*.json` and calibrator.
 
-The published bundle (release `demo-data-v1`, 2026-10-19) is 62,847,379 bytes, sha256
-`a402ef85e9f22ad90ec71059e32605055913f3942eb4aea263d9ac2078d45ee4`, with 75 complaint narratives changed by
-redaction.
+The first published bundle (release `demo-data-v1`, 2026-10-19) was 62,847,379 bytes, sha256
+`a402ef85e9f22ad90ec71059e32605055913f3942eb4aea263d9ac2078d45ee4`. The current one (release
+`demo-data-v2`, 2026-10-20 UTC) adds the Gemini calibrator and routing file and is 63,045,915 bytes, sha256
+`b37570c5af27b3d2697f4d8ee1b7dd25ec619efa7df3f326742da29a3c8fdb2f`. Both have 75 complaint narratives
+changed by redaction.
 
 The bundle is published as a GitHub release asset. The app downloads it on first start when
 `VSIA_BUNDLE_URL` is set, verifies `VSIA_BUNDLE_SHA256`, and unpacks only regular files under `data/`

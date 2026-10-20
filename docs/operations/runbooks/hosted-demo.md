@@ -83,7 +83,7 @@ The download URL is
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| "shared free key has reached today's limit" | Daily cap (ADR-0092) or Gemini daily quota | Expected under load; resets at midnight Pacific. Add `GROQ_API_KEY` as backup |
+| "shared free key has reached today's limit" | Daily cap (ADR-0092) or Gemini daily quota | Expected under load; resets at midnight Pacific. The Google free tier allows 500 requests per day per project for this model, shared with any local use of the same key, so run evaluations with a separate key or project. Add `GROQ_API_KEY` as backup |
 | Triage shows "free-tier rate limit was hit" | 15 requests per minute exceeded | Transient; wait a minute |
 | "This app has gone over its resource limits" | Memory ceiling | Reboot from Manage app; see ADR-0089 revisit trigger |
 | Warning "demo dataset could not be installed" and snapshot pages only | Bundle download failed, `VSIA_BUNDLE_SHA256` missing, or "bundle checksum mismatch" (secret and release asset disagree); the cause is in the warning | Fix the secret or re-copy the sha256 from the build output, then reboot (the install is tried once per process) |

@@ -19,7 +19,11 @@ not stored or leaked.
 - **Per day:** the app counts today's `llm_calls` rows for the provider since midnight Pacific (when Gemini
   quotas reset) and stops using the shared key at `VSIA_HOSTED_DAILY_LLM_CALLS` (default 400, chosen
   when Google listed 1,000 requests per day for the free tier; Google now shows free-tier limits only
-  per project in AI Studio, so the owner should keep the cap below the value shown there). The count
+  per project in AI Studio, so the owner should keep the cap below the value shown there). Measured on
+  2026-10-19: the 429 response for `gemini-3.5-flash-lite` names quota
+  `GenerateRequestsPerDayPerProjectPerModel-FreeTier` with value 500, so the cap of 400 leaves 100 calls
+  for the owner. The quota belongs to the Google project, not the app: calls made with the same key
+  elsewhere (local development, the evaluation harness) use it up too. The count
   starts at the later of midnight Pacific and the bundle install time, so calls the owner made locally
   before building the bundle (for example the evaluation run) do not use up the visitors' allowance.
 - When a cap is hit, the page says why and offers the two alternatives: the visitor's own key or the offline
